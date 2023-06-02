@@ -84,9 +84,6 @@ contract RevestSpiritSwap is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, R
     mapping (address => mapping (uint => uint)) private walletApprovals;
 
 
-    /// Mapping for tracking SPIRIT holders whitelist
-    mapping (address => bool) public whitelist;
-
     // WFTM contract
     address private constant WFTM = 0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83;
 
@@ -97,15 +94,13 @@ contract RevestSpiritSwap is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, R
     // Control variable to enable a given FNFT to utilize their smart wallet for proxy execution
     mapping (uint => bool) public proxyEnabled;
 
-    // Control variable to enable the whitelist or disable it
-    bool public whitelistEnabled;
-
     // Initialize the contract with the needed valeus
     constructor(address _provider, address _vE, address _distro, address _spiritAdmin) {
         addressRegistry = _provider;
         VOTING_ESCROW = _vE;
-        TOKEN = IVotingEscrow(_vE).token();
-        VestedEscrowSmartWallet wallet = new VestedEscrowSmartWallet(REWARD_TOKEN);
+        address _token = IVotingEscrow(_vE).token();
+        TOKEN = _token;
+        VestedEscrowSmartWallet wallet = new VestedEscrowSmartWallet(REWARD_TOKEN, _token, _vE);
         TEMPLATE = address(wallet);
         DISTRIBUTOR = _distro;
         ADMIN = _spiritAdmin;
@@ -131,77 +126,54 @@ contract RevestSpiritSwap is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, R
             || super.supportsInterface(interfaceId);
     }
 
-
-    function lockSpiritSwapTokens(
+    /**
+     * @notice Create a new lock entirely
+     * @param endTime the expiration date for the lock
+     * @param amountToLock amount of veFPIS to lock
+     */
+    function createNewLock(
         uint endTime,
-        uint amountToLock,
-        bool useWhitelist
-    ) external payable nonReentrant returns (uint fnftId) {    
-        require(msg.value >= weiFee, 'Insufficient fee!');
-        require(!useWhitelist || (whitelistEnabled && whitelist[msg.sender]), '!whitelisted');
+        uint amountToLock
+    ) external nonReentrant returns (uint fnftId) {    
 
-        // Immediately remove sender from whitelist to follow checks-effects-interactions
-        if(useWhitelist) {
-            whitelist[msg.sender] = false;
-        }
+        fnftId = _mintFNFT(endTime);
+        
+        // We deploy the smart wallet
+        address smartWallAdd = Clones.cloneDeterministic(TEMPLATE, keccak256(abi.encode(TOKEN, fnftId)));
+        VestedEscrowSmartWallet wallet = VestedEscrowSmartWallet(smartWallAdd);
 
-        // Pay fee: this is dependent on this contract being whitelisted to allow it to pay
-        // nothing via the typical method
-        // Pay fee to SPIRIT ADMIN
-        {
-            uint wftmFee = msg.value;
-            IWETH(WFTM).deposit{value: msg.value}();
-            IERC20(WFTM).safeTransfer(ADMIN, wftmFee);
-        }
+        // Transfer the tokens from the user to the smart wallet
+        IERC20(TOKEN).safeTransferFrom(msg.sender, smartWallAdd, amountToLock);
 
-        /// Mint FNFT
-        {
-            // Initialize the Revest config object
-            IRevest.FNFTConfig memory fnftConfig;
+        // We use our admin powers on SmartWalletWhitelistV2 to approve the newly created smart wallet
+        SmartWalletWhitelistV2(IVotingEscrow(VOTING_ESCROW).smart_wallet_checker()).approveWallet(smartWallAdd);
 
-            // Want FNFT to be extendable and support multiple deposits
-            fnftConfig.isMulti = true;
+        // We deposit our funds into the wallet
+        wallet.createLock(amountToLock, endTime);
+        emit DepositERC20OutputReceiver(msg.sender, TOKEN, amountToLock, fnftId, abi.encode(smartWallAdd));
+        
+    }
 
-            fnftConfig.maturityExtension = true;
+    /// Requires appTransferFromsEnabled on veFPIS
+    function migrateExistingLock() external nonReentrant returns (uint fnftId) {
+        IVotingEscrow veFPIS = IVotingEscrow(VOTING_ESCROW);
+        (int128 amount, uint endTime) = veFPIS.locked(msg.sender);
 
-            // Will result in the asset being sent back to this contract upon withdrawal
-            // Results solely in a callback
-            fnftConfig.pipeToContract = address(this);  
+        // Mint the FNFT
+        fnftId = _mintFNFT(endTime);
 
-            // Set these two arrays according to Revest specifications to say
-            // Who gets these FNFTs and how many copies of them we should create
-            address[] memory recipients = new address[](1);
-            recipients[0] = _msgSender();
+        // Deploy the smart wallet
+        address smartWallAdd = Clones.cloneDeterministic(TEMPLATE, keccak256(abi.encode(TOKEN, fnftId)));
+        VestedEscrowSmartWallet wallet = VestedEscrowSmartWallet(smartWallAdd);
 
-            uint[] memory quantities = new uint[](1);
-            quantities[0] = 1;
+        uint amountToLock = uint(int256(amount));
+        // This contract must be approved proxy, both globally and by msg.sender
+        veFPIS.transfer_from_app(msg.sender, smartWallAdd, amount);
+        veFPIS.proxy_slash(msg.sender, amountToLock);
 
-            address revest = IAddressRegistry(addressRegistry).getRevest();
-            
-            fnftId = IRevest(revest).mintTimeLock(endTime, recipients, quantities, fnftConfig);
-        }
-
-        address smartWallAdd;
-        {
-            // We deploy the smart wallet
-            smartWallAdd = Clones.cloneDeterministic(TEMPLATE, keccak256(abi.encode(TOKEN, fnftId)));
-            VestedEscrowSmartWallet wallet = VestedEscrowSmartWallet(smartWallAdd);
-
-            // Transfer the tokens from the user to the smart wallet
-            if(useWhitelist) {
-                amountToLock = FREE_AMOUNT;
-                IERC20(TOKEN).safeTransfer(smartWallAdd, amountToLock);
-            } else {
-                IERC20(TOKEN).safeTransferFrom(msg.sender, smartWallAdd, amountToLock);
-            }
-
-            // We use our admin powers on SmartWalletWhitelistV2 to approve the newly created smart wallet
-            SmartWalletWhitelistV2(IVotingEscrow(VOTING_ESCROW).smart_wallet_checker()).approveWallet(smartWallAdd);
-
-            // We deposit our funds into the wallet
-            wallet.createLock(amountToLock, endTime, VOTING_ESCROW);
-            emit DepositERC20OutputReceiver(msg.sender, TOKEN, amountToLock, fnftId, abi.encode(smartWallAdd));
-        }
+         // We deposit our funds into the wallet
+        wallet.createLock(amountToLock, endTime);
+        emit DepositERC20OutputReceiver(msg.sender, TOKEN, amountToLock, fnftId, abi.encode(smartWallAdd));
     }
 
 
@@ -279,7 +251,7 @@ contract RevestSpiritSwap is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, R
                 _setIsApproved(smartWallAdd, virtualAdd, true);
             }
         }
-        wallet.claimRewards(DISTRIBUTOR, VOTING_ESCROW, msg.sender, rewardsAdd, ADMIN);
+        wallet.claimRewards(DISTRIBUTOR, msg.sender, rewardsAdd);
     }       
 
     function proxyExecute(
@@ -311,6 +283,33 @@ contract RevestSpiritSwap is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, R
         }
     }
 
+    function _mintFNFT(uint endTime) internal returns (uint fnftId) {
+        /// Mint FNFT
+        
+        // Initialize the Revest config object
+        IRevest.FNFTConfig memory fnftConfig;
+
+        // Want FNFT to be extendable and support multiple deposits
+        fnftConfig.isMulti = true;
+
+        fnftConfig.maturityExtension = true;
+
+        // Will result in the asset being sent back to this contract upon withdrawal
+        // Results solely in a callback
+        fnftConfig.pipeToContract = address(this);  
+
+        // Set these two arrays according to Revest specifications to say
+        // Who gets these FNFTs and how many copies of them we should create
+        address[] memory recipients = new address[](1);
+        recipients[0] = msg.sender;
+
+        uint[] memory quantities = new uint[](1);
+        quantities[0] = 1;
+
+        address revest = IAddressRegistry(addressRegistry).getRevest();
+        
+        fnftId = IRevest(revest).mintTimeLock(endTime, recipients, quantities, fnftConfig);
+    }
 
     /// Admin Functions
 
@@ -354,16 +353,6 @@ contract RevestSpiritSwap is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, R
         IERC20(token).safeTransfer(msg.sender, amount);
     }
 
-    /// Can both add to and remove from the whitelist, depending on the value of bool
-    function batchModifyWhitelist(address[] memory holders, bool addToWhitelist) external onlyOwner {
-        for(uint i = 0; i < holders.length; i++) {
-            whitelist[holders[i]] = addToWhitelist;
-        }
-    }
-
-    function setWhitelistActive(bool _enableWhitelist) external onlyOwner {
-        whitelistEnabled = _enableWhitelist;
-    }
 
     /// View Functions
 

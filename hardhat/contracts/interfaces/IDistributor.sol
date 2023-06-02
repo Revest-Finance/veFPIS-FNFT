@@ -10,7 +10,7 @@ import '@openzeppelin/contracts/utils/introspection/IERC165.sol';
  */
 interface IDistributor {
 
-    function claim() external returns (uint amountTransferred);
+    function getYield() external returns (uint amountTransferred);
 
     function user_epoch_of(address _addr) external view returns (uint epoch);
 

@@ -17,6 +17,15 @@ interface IVotingEscrow {
         uint blk;
     }
 
+    struct LockedBalance {
+        int128 amount;
+        uint end;
+    }
+
+    function proxy_slash(address staker, uint amount) external;
+
+    function transfer_from_app(address _staker, address _transferTo, int128 _transfer_amt) external;
+
     function create_lock(uint _value, uint _unlock_time) external;
 
     function increase_amount(uint _value) external;

@@ -19,15 +19,19 @@ contract VestedEscrowSmartWallet {
 
     address private immutable REWARD_TOKEN;
 
-    uint private constant feeNumerator = 4;
+    address private immutable TOKEN;
 
-    uint private constant feeNumerator2 = 2;
+    address private immutable VOTING_ESCROW;
+
+    uint private constant feeNumerator = 10; // TODO: Make mutable
 
     uint private constant feeDenominator = 100;
 
-    constructor(address _rewardToken) {
+    constructor(address _rewardToken, address _token, address _vE) {
         MASTER = msg.sender;
         REWARD_TOKEN = _rewardToken;
+        TOKEN = _token;
+        VOTING_ESCROW = _vE;
     }
 
     modifier onlyMaster() {
@@ -35,15 +39,14 @@ contract VestedEscrowSmartWallet {
         _;
     }
 
-    function createLock(uint value, uint unlockTime, address votingEscrow) external onlyMaster {
+    function createLock(uint value, uint unlockTime) external onlyMaster {
         // Only callable from the parent contract, transfer tokens from user -> parent, parent -> VE
-        address token = IVotingEscrow(votingEscrow).token();
         // Single-use approval system
-        if(IERC20(token).allowance(address(this), votingEscrow) != MAX_INT) {
-            IERC20(token).approve(votingEscrow, MAX_INT);
+        if(IERC20(TOKEN).allowance(address(this), VOTING_ESCROW) != MAX_INT) {
+            IERC20(TOKEN).approve(VOTING_ESCROW, MAX_INT);
         }
         // Create the lock
-        IVotingEscrow(votingEscrow).create_lock(value, unlockTime);
+        IVotingEscrow(VOTING_ESCROW).create_lock(value, unlockTime);
         _cleanMemory();
     }
 
@@ -67,26 +70,14 @@ contract VestedEscrowSmartWallet {
 
     function claimRewards(
         address distributor, 
-        address votingEscrow, 
         address caller, 
-        address rewards,
-        address spiritAdmin
+        address rewards
     ) external onlyMaster {
-        bool exitFlag;
-        while(!exitFlag) {
-            IDistributor(distributor).claim();
-            exitFlag = IDistributor(distributor).user_epoch_of(address(this)) + 50 >= IVotingEscrow(votingEscrow).user_point_epoch(address(this));
-        }   
-
+        IDistributor(distributor).getYield();
         uint bal = IERC20(REWARD_TOKEN).balanceOf(address(this));
-        {
-            uint fee = bal * feeNumerator / feeDenominator;
-            uint fee2 = bal * feeNumerator2 / feeDenominator;
-            bal -= fee;
-            bal -= fee2;
-            IRewardsHandler(rewards).receiveFee(REWARD_TOKEN, fee);
-            IERC20(REWARD_TOKEN).safeTransfer(spiritAdmin, fee2);
-        }
+        uint fee = bal * feeNumerator / feeDenominator;
+        bal -= fee;
+        IRewardsHandler(rewards).receiveFee(REWARD_TOKEN, fee);
         IERC20(REWARD_TOKEN).safeTransfer(caller, bal);
         _cleanMemory();
     }
