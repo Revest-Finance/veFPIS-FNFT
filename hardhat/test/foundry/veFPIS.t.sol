@@ -22,7 +22,7 @@ contract veFPISRevest is Test {
     address public Provider = 0xd2c6eB7527Ab1E188638B86F2c14bbAd5A431d78;
     address public WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address public VOTING_ESCROW = 0x574C154C83432B0A45BA3ad2429C3fA242eD7359; //TODO: change to veFPIS 
-    adress public YIELD_DISTRIBUTOR = 0xE6D31C144BA99Af564bE7E81261f7bD951b802F6; //TODO: what is this ?
+    address public YIELD_DISTRIBUTOR = 0xE6D31C144BA99Af564bE7E81261f7bD951b802F6; //TODO: what is this?
 
     address public veFPISAdmin = 0xB1748C79709f4Ba2Dd82834B8c82D4a505003f27;
     address public revestOwner = 0x801e08919a483ceA4C345b5f8789E506e2624ccf;
@@ -44,7 +44,7 @@ contract veFPISRevest is Test {
 
 
     function setUp() public {
-        revestVe  = new RevestveFPIS(Provider, VOTING_ESCROW, admin);
+        revestVe  = new RevestVeFPIS(Provider, VOTING_ESCROW, admin);
         smartWalletChecker = new SmartWalletWhitelistV2(admin);
         
         hoax(admin, admin);
@@ -219,9 +219,5 @@ contract veFPISRevest is Test {
         //Value check
         console.log("Original balance of FPIS: ", oriFPIS);
         console.log("Current balance of FPIS: ", currentFPIS);
-    }
-
-    function claimYieldI() public {
-        public
     }
 }

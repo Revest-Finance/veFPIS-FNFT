@@ -36,7 +36,7 @@ interface IWETH {
  * @author RobAnon
  * @dev 
  */
-contract RevestSpiritSwap is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, ReentrancyGuard {
+contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, ReentrancyGuard {
     
     using SafeERC20 for IERC20;
 
@@ -95,7 +95,7 @@ contract RevestSpiritSwap is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, R
     mapping (uint => bool) public proxyEnabled;
 
     // Initialize the contract with the needed valeus
-    constructor(address _provider, address _vE, address _distro, address _spiritAdmin) {
+    constructor(address _provider, address _vE, address _distro, address _revestAdmin) {
         addressRegistry = _provider;
         VOTING_ESCROW = _vE;
         address _token = IVotingEscrow(_vE).token();
@@ -103,7 +103,7 @@ contract RevestSpiritSwap is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, R
         VestedEscrowSmartWallet wallet = new VestedEscrowSmartWallet(REWARD_TOKEN, _token, _vE);
         TEMPLATE = address(wallet);
         DISTRIBUTOR = _distro;
-        ADMIN = _spiritAdmin;
+        ADMIN = _revestAdmin;
     }
 
     modifier onlyRevestController() {
