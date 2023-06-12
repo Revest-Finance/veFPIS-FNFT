@@ -71,7 +71,6 @@ contract VestedEscrowSmartWallet {
     }
 
     function claimRewards(
-        address votingEscrow,
         address distributor, 
         address caller, 
         address rewards

@@ -152,6 +152,7 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
         emit DepositERC20OutputReceiver(msg.sender, TOKEN, amountToLock, fnftId, abi.encode(smartWallAdd));
     }
 
+    /// Requires the msg.sender needs to call approve transfer amount on
     /// Requires appTransferFromsEnabled on veFPIS
     function migrateExistingLock() external nonReentrant returns (uint fnftId) {
         IVotingEscrow veFPIS = IVotingEscrow(VOTING_ESCROW);
@@ -166,8 +167,11 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
 
         uint amountToLock = uint(int256(amount));
         // This contract must be approved proxy, both globally and by msg.sender
-        veFPIS.transfer_from_app(msg.sender, smartWallAdd, amount);
+        veFPIS.transfer_to_app(msg.sender, smartWallAdd, amount);
         veFPIS.proxy_slash(msg.sender, amountToLock);
+
+        // We use our admin powers on SmartWalletWhitelistV2 to approve the newly created smart wallet
+        SmartWalletWhitelistV2(IVotingEscrow(VOTING_ESCROW).smart_wallet_checker()).approveWallet(smartWallAdd);
 
          // We deposit our funds into the wallet
         wallet.createLock(amountToLock, endTime, VOTING_ESCROW, DISTRIBUTOR);
@@ -239,7 +243,7 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
         address rewardsAdd = IAddressRegistry(addressRegistry).getRewardsHandler();
         address smartWallAdd = Clones.cloneDeterministic(TEMPLATE, keccak256(abi.encode(TOKEN, fnftId)));
         VestedEscrowSmartWallet wallet = VestedEscrowSmartWallet(smartWallAdd);
-        wallet.claimRewards(VOTING_ESCROW, DISTRIBUTOR, msg.sender, rewardsAdd);
+        wallet.claimRewards(DISTRIBUTOR, msg.sender, rewardsAdd);
     }       
 
     function proxyExecute(
