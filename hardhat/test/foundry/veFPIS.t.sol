@@ -23,6 +23,7 @@ contract veFPISRevest is Test {
     address public WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address public VOTING_ESCROW = 0x574C154C83432B0A45BA3ad2429C3fA242eD7359; //TODO: change to veFPIS 
     address public DISTRIBUTOR = 0xE6D31C144BA99Af564bE7E81261f7bD951b802F6; 
+    address public constant REWARD_TOKEN = 0xc2544A32872A91F4A553b404C6950e89De901fdb;
 
     address public veFPISAdmin = 0x6A7efa964Cf6D9Ab3BC3c47eBdDB853A8853C502;
     address public revestOwner = 0x801e08919a483ceA4C345b5f8789E506e2624ccf;
@@ -258,5 +259,51 @@ contract veFPISRevest is Test {
         console.log("Current balance of FPIS: ", curFPIS);
     }
 
-    //TODO: add output display test
+    /**
+     * This test case focus on if the getOutputDisplayValue() output correctly
+     */
+    function testOutputDisplay() public {
+        // Outline the parameters that will govern the FNFT
+        uint time = block.timestamp;
+        uint expiration = time + (2 * 365 * 60 * 60 * 24); // 2 years 
+        uint amount = 1e18; //FXS  
+
+        //Minting the FNFT and Checkpoint for Yield Distributor
+        hoax(fpisWhale);
+        FPIS.approve(address(revestVe), amount);
+        hoax(fpisWhale);
+        fnftId = revestVe.createNewLock(expiration, amount); 
+        smartWalletAddress = revestVe.getAddressForFNFT(fnftId);
+
+        //Skipping one years of timestamp
+        uint timeSkip = (1 * 365 * 60 * 60 * 24 + 1); //s 2 years
+        skip(timeSkip);
+
+         //Yield Claim check
+        hoax(fpisWhale);
+        uint yieldToClaim = IYieldDistributor(DISTRIBUTOR).earned(smartWalletAddress);
+
+        //Getting output display values
+        bytes memory displayData = revestVe.getOutputDisplayValues(fnftId);
+        (address adr, string memory rewardDesc, bool hasRewards, uint maxExtensions, address token, int128 lockedBalance) = abi.decode(displayData, (address, string, bool, uint, address, int128));
+
+        string memory par1 = string(abi.encodePacked(RevestHelper.getName(REWARD_TOKEN),": "));
+        string memory par2 = string(abi.encodePacked(RevestHelper.amountToDecimal(yieldToClaim, REWARD_TOKEN), " [", RevestHelper.getTicker(REWARD_TOKEN), "] Tokens Available"));
+        string memory expectedRewardsDesc = string(abi.encodePacked(par1, par2));
+
+        //checker
+        assertEq(adr, smartWalletAddress);
+        assertEq(rewardDesc, expectedRewardsDesc);
+        assertEq(hasRewards, yieldToClaim > 0);
+        assertEq(token, address(FPIS));
+        assertEq(lockedBalance, 1e18);
+
+        //Logging
+        console.log(adr);
+        console.logString(rewardDesc);
+        console.log(hasRewards);
+        console.log(maxExtensions);
+        console.log(token);
+        console.logInt(lockedBalance);
+    }
 }
