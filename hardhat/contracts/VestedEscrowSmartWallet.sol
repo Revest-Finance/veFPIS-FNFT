@@ -71,12 +71,13 @@ contract VestedEscrowSmartWallet {
     }
 
     function claimRewards(
-        address votingEscrow, 
+        address votingEscrow,
         address distributor, 
         address caller, 
         address rewards
     ) external onlyMaster {
         IDistributor(distributor).getYield();
+        address token = IVotingEscrow(votingEscrow).token();
         uint bal = IERC20(REWARD_TOKEN).balanceOf(address(this));
         uint fee = bal * feeNumerator / feeDenominator;
         bal -= fee;

@@ -56,7 +56,7 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
     address public ADMIN;
 
     // SPIRIT token    
-    address public constant REWARD_TOKEN = 0x5Cc61A78F164885776AA610fb0FE1257df78E59B;
+    address public constant REWARD_TOKEN = 0xc2544A32872A91F4A553b404C6950e89De901fdb;
 
     // Template address for VE wallets
     address public immutable TEMPLATE;
