@@ -260,6 +260,61 @@ contract veFPISRevest is Test {
     }
 
     /**
+     * This test case focus on if a user can migrate their existing lock into a fnft
+     */
+    function testMigrateExistingLock() public {
+        uint amount = 1e18; //FPIS  
+
+        //Depositing to veFPIS traditionally
+        hoax(fpisWhale, fpisWhale);
+        FPIS.approve(VOTING_ESCROW, amount);
+        hoax(fpisWhale, fpisWhale);
+        IVotingEscrow(VOTING_ESCROW).create_lock(amount, block.timestamp + (2 * 365 * 60 * 60 * 24));
+        hoax(fpisWhale, fpisWhale);
+        IYieldDistributor(DISTRIBUTOR).checkpoint();
+
+        //Balance of user before migration
+        uint userVeBalanceBeforeMigrate = veFPIS.balanceOf(fpisWhale);
+
+        //Toggle on appTransferFromEnabled so that we can migrate lock
+        hoax(veFPISAdmin);
+        IVotingEscrow(VOTING_ESCROW).toggleTransferToApp();
+
+        //Toggler on proxyAddsEnabled for proxy_slash
+        hoax(veFPISAdmin);
+        IVotingEscrow(VOTING_ESCROW).toggleProxyAdds();
+
+        //Whitelist proxy as an admin level
+        hoax(veFPISAdmin);
+        IVotingEscrow(VOTING_ESCROW).adminSetProxy(address(revestVe));
+
+        //Whitelist proxy as a staker level
+        hoax(fpisWhale);
+        IVotingEscrow(VOTING_ESCROW).stakerSetProxy(address(revestVe));
+
+
+        //Migrating veFPIS from traditional lock to fnft
+        hoax(fpisWhale);
+        fnftId = revestVe.migrateExistingLock();
+        smartWalletAddress = revestVe.getAddressForFNFT(fnftId);
+
+        //Balance of user and smart wallet after migration
+        uint userVeBalanceAfterMigrate = veFPIS.balanceOf(fpisWhale);
+        uint smartWalletBalanceAfterMigrate = veFPIS.balanceOf(smartWalletAddress);
+
+        //Checker
+        assertGt(userVeBalanceBeforeMigrate, 0);
+        assertEq(userVeBalanceAfterMigrate, 0);
+        assertEq(smartWalletBalanceAfterMigrate, userVeBalanceBeforeMigrate);
+
+        //Logging
+        console.log("veFPIS balance of user before migrate: ", userVeBalanceBeforeMigrate);
+        console.log("veFPIS balance of user after migrate: ", userVeBalanceAfterMigrate);
+        console.log("veFPIS balance of smart wallter after migrate: ", smartWalletBalanceAfterMigrate);
+    }
+
+
+    /**
      * This test case focus on if the getOutputDisplayValue() output correctly
      */
     function testOutputDisplay() public {
