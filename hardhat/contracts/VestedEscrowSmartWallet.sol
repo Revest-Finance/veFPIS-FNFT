@@ -3,6 +3,9 @@
 import "./interfaces/IVotingEscrow.sol";
 import "./interfaces/IDistributor.sol";
 import "./interfaces/IRewardsHandler.sol";
+import "./interfaces/IYieldDistributor.sol";
+
+
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 
@@ -21,17 +24,15 @@ contract VestedEscrowSmartWallet {
 
     address private immutable TOKEN;
 
-    address private immutable VOTING_ESCROW;
 
     uint private constant feeNumerator = 10; // TODO: Make mutable
 
     uint private constant feeDenominator = 100;
 
-    constructor(address _rewardToken, address _token, address _vE) {
+    constructor(address _rewardToken, address _token) {
         MASTER = msg.sender;
         REWARD_TOKEN = _rewardToken;
         TOKEN = _token;
-        VOTING_ESCROW = _vE;
     }
 
     modifier onlyMaster() {
@@ -39,14 +40,15 @@ contract VestedEscrowSmartWallet {
         _;
     }
 
-    function createLock(uint value, uint unlockTime) external onlyMaster {
+    function createLock(uint value, uint unlockTime, address votingEscrow, address distributor) external onlyMaster {
         // Only callable from the parent contract, transfer tokens from user -> parent, parent -> VE
         // Single-use approval system
-        if(IERC20(TOKEN).allowance(address(this), VOTING_ESCROW) != MAX_INT) {
-            IERC20(TOKEN).approve(VOTING_ESCROW, MAX_INT);
+        if(IERC20(TOKEN).allowance(address(this), votingEscrow) != MAX_INT) {
+            IERC20(TOKEN).approve(votingEscrow, MAX_INT);
         }
         // Create the lock
-        IVotingEscrow(VOTING_ESCROW).create_lock(value, unlockTime);
+        IVotingEscrow(votingEscrow).create_lock(value, unlockTime);
+        IYieldDistributor(distributor).checkpoint();
         _cleanMemory();
     }
 
@@ -69,6 +71,7 @@ contract VestedEscrowSmartWallet {
     }
 
     function claimRewards(
+        address votingEscrow, 
         address distributor, 
         address caller, 
         address rewards

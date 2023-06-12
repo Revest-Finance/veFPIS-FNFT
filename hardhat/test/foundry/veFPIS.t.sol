@@ -22,9 +22,9 @@ contract veFPISRevest is Test {
     address public Provider = 0xd2c6eB7527Ab1E188638B86F2c14bbAd5A431d78;
     address public WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address public VOTING_ESCROW = 0x574C154C83432B0A45BA3ad2429C3fA242eD7359; //TODO: change to veFPIS 
-    address public YIELD_DISTRIBUTOR = 0xE6D31C144BA99Af564bE7E81261f7bD951b802F6; //TODO: what is this?
+    address public DISTRIBUTOR = 0xE6D31C144BA99Af564bE7E81261f7bD951b802F6; 
 
-    address public veFPISAdmin = 0xB1748C79709f4Ba2Dd82834B8c82D4a505003f27;
+    address public veFPISAdmin = 0x6A7efa964Cf6D9Ab3BC3c47eBdDB853A8853C502;
     address public revestOwner = 0x801e08919a483ceA4C345b5f8789E506e2624ccf;
 
     Revest revest = Revest(0x9f551F75DB1c301236496A2b4F7CeCb2d1B2b242);
@@ -44,7 +44,7 @@ contract veFPISRevest is Test {
 
 
     function setUp() public {
-        revestVe  = new RevestVeFPIS(Provider, VOTING_ESCROW, admin);
+        revestVe  = new RevestVeFPIS(Provider, VOTING_ESCROW, DISTRIBUTOR, admin);
         smartWalletChecker = new SmartWalletWhitelistV2(admin);
         
         hoax(admin, admin);
@@ -74,45 +74,24 @@ contract veFPISRevest is Test {
     
         //Outline the parameters that will govern the FNFT
         uint expiration = time + (2 * 365 * 60 * 60 * 24); // 2 years 
-        uint fee = 1 wei;
         uint amount = 1.1e18; //FPIS 
 
         //Mint the FNFT
         hoax(fpisWhale);
         FPIS.approve(address(revestVe), amount);
         hoax(fpisWhale);
-        fnftId = revestVe.lockTokens(expiration, amount);
+        fnftId = revestVe.createNewLock(expiration, amount);
 
         uint expectedValue = revestVe.getValue(fnftId);
-        console.log("veFPIS balance should be around 2e18: ", expectedValue);
         smartWalletAddress = revestVe.getAddressForFNFT(fnftId);
+
+        //Check
+        assert(expectedValue >= 2e18);
+
+        //Logging
+        console.log("veFPIS balance should be around 2e18: ", expectedValue);
         console.log("SmartWallet add at address: ", smartWalletAddress);
         console.log("The minted FNFT has the ID: ", fnftId);
-    }
-
-
-    /**
-     * This test case focus on if when the admin can receive the fee
-     */
-    function testReceiveFee() public {
-        //Outline the parameters that will govern the FNFT
-        uint time = block.timestamp;
-        uint expiration = time + (2 * 365 * 60 * 60 * 24); // 2 years 
-        uint fee = 1 wei;
-        uint amount = 1e18; //FPIS  
-
-        //Balance of admin before the minting the lock
-        console.log("FPIS balance of revest admin before minting: ", FPIS.balanceOf(address(admin)));
-
-        //Minting the FNFT
-        hoax(fpisWhale);
-        FPIS.approve(address(revestVe), amount);
-        hoax(fpisWhale);
-        fnftId = revestVe.lockTokens(expiration, amount);
-
-        //Value check
-        console.log("FPIS balance of revest admin after minting: ", FPIS.balanceOf(address(admin)));
-        assertEq(FPIS.balanceOf(address(admin)), 1e17);
     }
 
     /**
@@ -128,12 +107,11 @@ contract veFPISRevest is Test {
         hoax(fpisWhale);
         FPIS.approve(address(revestVe), amount);
         hoax(fpisWhale);
-        fnftId = revestVe.lockTokens(expiration, amount);
+        fnftId = revestVe.createNewLock(expiration, amount);
         smartWalletAddress = revestVe.getAddressForFNFT(fnftId);
-        console.log("SmartWallet add at address: ", smartWalletAddress);
 
-        //Testing Phase
-        console.log("Current veFPIS balance in Smart Wallet: ", revestVe.getValue(fnftId));
+        //veFXS Balance after first time deposit
+        uint oriVeFPIS = revestVe.getValue(fnftId);
 
         //Destroy the address of smart wallet for testing purpose
         destroyAccount(smartWalletAddress, address(admin));
@@ -144,7 +122,11 @@ contract veFPISRevest is Test {
         hoax(fpisWhale);
         revest.depositAdditionalToFNFT(fnftId, amount, 1);
 
-        //Value Check
+        //Check
+        assert(revestVe.getValue(fnftId) > oriVeFPIS);
+
+        //Logging
+        console.log("Original veFPIS balance in Smart Wallet: ", oriVeFPIS);
         console.log("New veFPIS balance in Smart Wallet: ", revestVe.getValue(fnftId));
     }
 
@@ -155,14 +137,13 @@ contract veFPISRevest is Test {
         // Outline the parameters that will govern the FNFT
         uint time = block.timestamp;
         uint expiration = time + (2 * 365 * 60 * 60 * 24); // 2 years 
-        uint fee = 1 wei;
         uint amount = 1e18; //FPIS  
 
         //Minting the FNFT
         hoax(fpisWhale);
         FPIS.approve(address(revestVe), amount);
         hoax(fpisWhale);
-        fnftId = revestVe.lockTokens(expiration, amount);
+        fnftId = revestVe.createNewLock(expiration, amount);
         smartWalletAddress = revestVe.getAddressForFNFT(fnftId);
 
         //Skipping two weeks of timestamp
@@ -188,14 +169,13 @@ contract veFPISRevest is Test {
         // Outline the parameters that will govern the FNFT
         uint time = block.timestamp;
         uint expiration = time + (2 * 365 * 60 * 60 * 24); // 2 years 
-        uint fee = 1 wei;
         uint amount = 1e18; //FPIS  
 
         //Minting the FNFT
         hoax(fpisWhale);
         FPIS.approve(address(revestVe), amount);
         hoax(fpisWhale);
-        fnftId = revestVe.lockTokens(expiration, amount);
+        fnftId = revestVe.createNewLock(expiration, amount);
         smartWalletAddress = revestVe.getAddressForFNFT(fnftId);
 
         //Original balance of FPIS after depositing the FNFT
@@ -216,8 +196,60 @@ contract veFPISRevest is Test {
         revest.withdrawFNFT(fnftId, 1);
         uint currentFPIS = FPIS.balanceOf(fpisWhale);
 
+        //Check
+        assertEq(currentFPIS - oriFPIS, 1e18);
+
         //Value check
         console.log("Original balance of FPIS: ", oriFPIS);
         console.log("Current balance of FPIS: ", currentFPIS);
+    }
+
+    /**
+     * This test case focus on if user can receive yield from their fnft
+     */
+    function testClaimYield() public {
+        // Outline the parameters that will govern the FNFT
+        uint time = block.timestamp;
+        uint expiration = time + (2 * 365 * 60 * 60 * 24); // 2 years 
+        uint amount = 1e18; //FXS  
+
+        //Minting the FNFT and Checkpoint for Yield Distributor
+        hoax(fpisWhale);
+        FPIS.approve(address(revestVe), amount);
+        hoax(fpisWhale);
+        fnftId = revestVe.createNewLock(expiration, amount);
+        smartWalletAddress = revestVe.getAddressForFNFT(fnftId);
+        // hoax(fxsWhale);
+        // IYieldDistributor(DISTRIBUTOR).checkpointOtherUser(smartWalletAddress);
+
+        //Original balance of FXS before claiming yield
+        uint oriFPIS = FPIS.balanceOf(fpisWhale);
+
+        //Skipping one years of timestamp
+        uint timeSkip = (1 * 365 * 60 * 60 * 24 + 1); //s 2 years
+        skip(timeSkip);
+
+        //Destroy the address of smart wallet for testing purpose
+        destroyAccount(smartWalletAddress, address(admin));
+
+        //Yield Claim check
+        hoax(fpisWhale);
+        uint yieldToClaim = IYieldDistributor(DISTRIBUTOR).earned(smartWalletAddress);
+
+        //Claim yield
+        hoax(fpisWhale);
+        revestVe.triggerOutputReceiverUpdate(fnftId, bytes(""));
+        
+        //Balance of FXS after claiming yield
+        uint curFPIS = FPIS.balanceOf(fpisWhale);
+
+        //Checker
+        assertGt(yieldToClaim, 0);
+        assertEq(curFPIS, oriFPIS + yieldToClaim);
+
+        //Console
+        console.log("Yield to claim: ", yieldToClaim);
+        console.log("Original balance of FPIS: ", oriFPIS);
+        console.log("Current balance of FPIS: ", curFPIS);
     }
 }

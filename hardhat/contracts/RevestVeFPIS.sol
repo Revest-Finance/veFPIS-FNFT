@@ -100,7 +100,7 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
         VOTING_ESCROW = _vE;
         address _token = IVotingEscrow(_vE).token();
         TOKEN = _token;
-        VestedEscrowSmartWallet wallet = new VestedEscrowSmartWallet(REWARD_TOKEN, _token, _vE);
+        VestedEscrowSmartWallet wallet = new VestedEscrowSmartWallet(REWARD_TOKEN, _token);
         TEMPLATE = address(wallet);
         DISTRIBUTOR = _distro;
         ADMIN = _revestAdmin;
@@ -135,7 +135,6 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
         uint endTime,
         uint amountToLock
     ) external nonReentrant returns (uint fnftId) {    
-
         fnftId = _mintFNFT(endTime);
         
         // We deploy the smart wallet
@@ -149,9 +148,8 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
         SmartWalletWhitelistV2(IVotingEscrow(VOTING_ESCROW).smart_wallet_checker()).approveWallet(smartWallAdd);
 
         // We deposit our funds into the wallet
-        wallet.createLock(amountToLock, endTime);
+        wallet.createLock(amountToLock, endTime, VOTING_ESCROW, DISTRIBUTOR);
         emit DepositERC20OutputReceiver(msg.sender, TOKEN, amountToLock, fnftId, abi.encode(smartWallAdd));
-        
     }
 
     /// Requires appTransferFromsEnabled on veFPIS
@@ -172,7 +170,7 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
         veFPIS.proxy_slash(msg.sender, amountToLock);
 
          // We deposit our funds into the wallet
-        wallet.createLock(amountToLock, endTime);
+        wallet.createLock(amountToLock, endTime, VOTING_ESCROW, DISTRIBUTOR);
         emit DepositERC20OutputReceiver(msg.sender, TOKEN, amountToLock, fnftId, abi.encode(smartWallAdd));
     }
 
@@ -241,17 +239,7 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
         address rewardsAdd = IAddressRegistry(addressRegistry).getRewardsHandler();
         address smartWallAdd = Clones.cloneDeterministic(TEMPLATE, keccak256(abi.encode(TOKEN, fnftId)));
         VestedEscrowSmartWallet wallet = VestedEscrowSmartWallet(smartWallAdd);
-        { 
-            // Want this to be re-run if we change fee distributors or rewards handlers
-            address virtualAdd = address(uint160(uint256(keccak256(abi.encodePacked(DISTRIBUTOR, rewardsAdd)))));
-            if(!_isApproved(smartWallAdd, virtualAdd)) {
-                address[] memory addrArray = new address[](1);
-                addrArray[0] = REWARD_TOKEN;
-                wallet.proxyApproveAll(addrArray, rewardsAdd);
-                _setIsApproved(smartWallAdd, virtualAdd, true);
-            }
-        }
-        wallet.claimRewards(DISTRIBUTOR, msg.sender, rewardsAdd);
+        wallet.claimRewards(VOTING_ESCROW, DISTRIBUTOR, msg.sender, rewardsAdd);
     }       
 
     function proxyExecute(
