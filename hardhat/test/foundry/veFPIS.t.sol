@@ -205,7 +205,7 @@ contract veFPISRevest is Test {
     }
 
     /**
-     * This test case focus on if user can receive yield from their fnft
+     * This test case focus on if user can receive yield from their fnft and if we receive fee 
      */
     function testClaimYield() public {
         // Outline the parameters that will govern the FNFT
@@ -243,13 +243,22 @@ contract veFPISRevest is Test {
         //Balance of FXS after claiming yield
         uint curFPIS = FPIS.balanceOf(fpisWhale);
 
+        //Balance of Revest Reward REceive Address:
+        address revestRewardReceiver = 0xA4E7f2a1EDB5AD886baA09Fb258F8ACA7c934ba6;
+        uint feeFPIS = FPIS.balanceOf(revestRewardReceiver);
+
         //Checker
         assertGt(yieldToClaim, 0);
-        assertEq(curFPIS, oriFPIS + yieldToClaim);
+        assertGt(feeFPIS, 0);
+        assertEq(curFPIS, oriFPIS + yieldToClaim - feeFPIS);
 
         //Console
         console.log("Yield to claim: ", yieldToClaim);
         console.log("Original balance of FPIS: ", oriFPIS);
         console.log("Current balance of FPIS: ", curFPIS);
     }
+
+    //TODO: add claim fee
+
+    //TODO: add output display test
 }

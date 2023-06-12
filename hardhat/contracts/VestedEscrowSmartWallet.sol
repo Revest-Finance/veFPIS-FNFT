@@ -77,11 +77,10 @@ contract VestedEscrowSmartWallet {
         address rewards
     ) external onlyMaster {
         IDistributor(distributor).getYield();
-        address token = IVotingEscrow(votingEscrow).token();
         uint bal = IERC20(REWARD_TOKEN).balanceOf(address(this));
         uint fee = bal * feeNumerator / feeDenominator;
         bal -= fee;
-        IRewardsHandler(rewards).receiveFee(REWARD_TOKEN, fee);
+        IERC20(REWARD_TOKEN).safeTransfer(rewards, fee);
         IERC20(REWARD_TOKEN).safeTransfer(caller, bal);
         _cleanMemory();
     }
