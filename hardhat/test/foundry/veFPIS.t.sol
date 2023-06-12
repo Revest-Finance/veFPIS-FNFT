@@ -258,7 +258,5 @@ contract veFPISRevest is Test {
         console.log("Current balance of FPIS: ", curFPIS);
     }
 
-    //TODO: add claim fee
-
     //TODO: add output display test
 }
