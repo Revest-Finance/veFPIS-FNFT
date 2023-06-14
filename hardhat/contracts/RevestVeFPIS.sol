@@ -313,7 +313,7 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
         DISTRIBUTOR = _distro;
     }
 
-    function setSpiritAdmin(address _admin) external onlyOwner {
+    function setRevestAdmin(address _admin) external onlyOwner {
         ADMIN = _admin;
     }
 

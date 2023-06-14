@@ -361,4 +361,142 @@ contract veFPISRevest is Test {
         console.log(token);
         console.logInt(lockedBalance);
     }
+
+    // _____________________________________ Below are additional basic test for the contract ___________________________
+
+    /**
+     * 
+     */
+    function testAddressRegistry() public {
+        //Getter Method test
+        address addressRegistry = revestVe.getAddressRegistry();
+        assertEq(addressRegistry, Provider, "Address Registry is incorrect!");
+
+        //Calling from non-owner
+        hoax(address(0xdead));
+        vm.expectRevert("Ownable: caller is not the owner");
+        revestVe.setAddressRegistry(address(0xdead));
+
+        //Setter Method test
+        hoax(revestVe.owner());
+        revestVe.setAddressRegistry(address(0xdead));
+        address newAddressRegistry = revestVe.getAddressRegistry();
+        assertEq(newAddressRegistry, address(0xdead), "New Address Registry is not set correctly!");
+    }
+
+    function testRevestAdmin() public {
+        //Getter Method test
+        address revestAdmin = revestVe.ADMIN();
+        assertEq(revestAdmin, admin, "Revest Admin is incorrect!");
+
+        //Calling from non-owner
+        hoax(address(0xdead));
+        vm.expectRevert("Ownable: caller is not the owner");
+        revestVe.setRevestAdmin(address(0));
+
+        //Setter Method test
+        hoax(revestVe.owner());
+        revestVe.setRevestAdmin(address(0xdead));
+        address newAddressRegistry = revestVe.ADMIN();
+        assertEq(newAddressRegistry, address(0xdead), "New revest admin is not set correctly");
+    }
+
+    function testAsset() public {
+        //Getter Method test
+        address asset = revestVe.getAsset(0);
+        assertEq(asset, VOTING_ESCROW, "Asset/Underlying Ve contract is incorrect");
+    }
+
+    function testWeiFee() public {
+        //Getter Method  test
+        uint weiFee = revestVe.getFlatWeiFee(fpisWhale);
+        assertEq(weiFee, 1 ether, "Current weiFee is incorrect!");
+
+        //Calling from non-owner
+        hoax(address(0xdead));
+        vm.expectRevert("Ownable: caller is not the owner");
+        revestVe.setWeiFee(2 ether);
+        
+         //Setter Method test
+        hoax(revestVe.owner());
+        revestVe.setWeiFee(2 ether);
+        uint newWeiFee = revestVe.getFlatWeiFee(fpisWhale);
+        assertEq(newWeiFee, 2 ether, "New wei fei is not set correctly");
+    }
+
+    function testERC20Fee() public {
+        //Getter Method
+        uint fee = revestVe.getERC20Fee(fpisWhale);
+        assertEq(fee, 0, "Current fee percentage is incorrect!"); 
+    }
+
+    function testMetaData() public {
+        //Getter Method
+        string memory metadata = revestVe.getCustomMetadata(0);
+        assertEq(metadata, "https://revest.mypinata.cloud/ipfs/QmXYdhFqtKFtYW9aEQ8cpPKTm3T1Dv3Hd1uz9ZuYpzeN89", "Metadata is incorrect!");
+
+        //Calling from non-owner
+        hoax(address(0xdead));
+        vm.expectRevert("Ownable: caller is not the owner");
+        revestVe.setMetadata("https://revest.mypinata.cloud/ipfs/fake");
+
+        //Setter Method test
+        hoax(address(revestVe.owner()));
+        revestVe.setMetadata("https://revest.mypinata.cloud/ipfs/fake");
+        string memory newMetadata = revestVe.getCustomMetadata(0);
+        assertEq(newMetadata, "https://revest.mypinata.cloud/ipfs/fake", "Metadata is not set correctly!");
+    }
+
+    function testHandleFNFTRemaps() public {
+        vm.expectRevert("Not applicable");
+        revestVe.handleFNFTRemaps(0, new uint[](0), address(0xdead), false);
+    }
+
+    function testRescueNativeFunds() public {
+        //Fund the contract some money that is falsely allocated
+        vm.deal(address(revestVe), 10 ether);
+        assertEq(address(revestVe).balance, 10 ether, "Amount of fund does not match!");
+
+        //Calling rescue fund from not owner
+        hoax(address(0xdead));
+        vm.expectRevert("Ownable: caller is not the owner");
+        revestVe.rescueNativeFunds();
+
+        //Balance of Revest Owner before rescueing fund
+        uint initialBalance = address(revestVe.owner()).balance;
+
+        //Rescue native fund
+        hoax(revestVe.owner(), revestVe.owner());
+        revestVe.rescueNativeFunds();
+        uint currentBalance = address(revestVe.owner()).balance;
+        assertGt(currentBalance, initialBalance, "Fund has not been withdrawn to revest owner!");
+    }
+
+    function testRescueERC20() public {
+        //Fund the contract some money that is false allocated #PEPE
+        ERC20 PEPE = ERC20(0x6982508145454Ce325dDbE47a25d4ec3d2311933);
+
+        deal(address(PEPE), address(revestVe), 10 ether);
+        assertEq(PEPE.balanceOf(address(revestVe)), 10 ether, "Amount of fund does not match!");
+
+        //Calling rescue fund from not owner
+        hoax(address(0xdead));
+        vm.expectRevert("Ownable: caller is not the owner");
+        revestVe.rescueERC20(address(PEPE));
+
+
+        //Balance of Revest Owner before rescueing fund
+        uint initialBalance = PEPE.balanceOf(revestVe.owner());
+
+        //Rescue PEPE
+        hoax(revestVe.owner(), revestVe.owner());
+        revestVe.rescueERC20(address(PEPE));
+        uint currentBalance = PEPE.balanceOf(revestVe.owner());
+
+        assertGt(currentBalance, initialBalance, "Fund has not been withdrawn to revest owner!");
+    }
+
+    receive() external payable {
+
+    }
 }
