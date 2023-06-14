@@ -218,7 +218,7 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
 
     // Callback from Revest.sol to extend maturity
     function handleTimelockExtensions(uint fnftId, uint expiration, address) external override onlyRevestController {
-        require(expiration - block.timestamp <= MAX_LOCKUP, 'Max lockup is 2 years');
+        require(expiration - block.timestamp <= MAX_LOCKUP, 'Max lockup is 4 years');
         address smartWallAdd = Clones.cloneDeterministic(TEMPLATE, keccak256(abi.encode(TOKEN, fnftId)));
         VestedEscrowSmartWallet wallet = VestedEscrowSmartWallet(smartWallAdd);
         wallet.increaseUnlockTime(expiration, VOTING_ESCROW);
