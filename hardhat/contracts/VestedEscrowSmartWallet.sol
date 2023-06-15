@@ -20,19 +20,22 @@ contract VestedEscrowSmartWallet {
 
     address private immutable MASTER;
 
+    address private immutable LOCK_TOKEN;
+
     address private immutable REWARD_TOKEN;
 
-    address private immutable TOKEN;
+    address private immutable VOTING_ESCROW;
 
+    address private immutable DISTRIBUTOR;
 
-    uint private constant feeNumerator = 10; // TODO: Make mutable
+    uint private constant PERCENTAGE = 1000;
 
-    uint private constant feeDenominator = 100;
-
-    constructor(address _rewardToken, address _token) {
+    constructor(address _votingEscrow, address _distributor) {
         MASTER = msg.sender;
-        REWARD_TOKEN = _rewardToken;
-        TOKEN = _token;
+        VOTING_ESCROW = _votingEscrow;
+        LOCK_TOKEN = IVotingEscrow(_votingEscrow).token();
+        REWARD_TOKEN = IVotingEscrow(_votingEscrow).token();
+        DISTRIBUTOR = _distributor;
     }
 
     modifier onlyMaster() {
@@ -43,8 +46,8 @@ contract VestedEscrowSmartWallet {
     function createLock(uint value, uint unlockTime, address votingEscrow, address distributor) external onlyMaster {
         // Only callable from the parent contract, transfer tokens from user -> parent, parent -> VE
         // Single-use approval system
-        if(IERC20(TOKEN).allowance(address(this), votingEscrow) != MAX_INT) {
-            IERC20(TOKEN).approve(votingEscrow, MAX_INT);
+        if(IERC20(LOCK_TOKEN).allowance(address(this), votingEscrow) != MAX_INT) {
+            IERC20(LOCK_TOKEN).approve(votingEscrow, MAX_INT);
         }
         // Create the lock
         IVotingEscrow(votingEscrow).create_lock(value, unlockTime);
@@ -71,13 +74,13 @@ contract VestedEscrowSmartWallet {
     }
 
     function claimRewards(
-        address distributor, 
         address caller, 
-        address rewards
+        address rewards, 
+        uint performanceFee
     ) external onlyMaster {
-        IDistributor(distributor).getYield();
+        IDistributor(DISTRIBUTOR).getYield();
         uint bal = IERC20(REWARD_TOKEN).balanceOf(address(this));
-        uint fee = bal * feeNumerator / feeDenominator;
+        uint fee = bal * performanceFee / PERCENTAGE;
         bal -= fee;
         IERC20(REWARD_TOKEN).safeTransfer(rewards, fee);
         IERC20(REWARD_TOKEN).safeTransfer(caller, bal);
