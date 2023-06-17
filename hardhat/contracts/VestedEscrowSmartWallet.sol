@@ -43,33 +43,34 @@ contract VestedEscrowSmartWallet {
         _;
     }
 
-    function createLock(uint value, uint unlockTime, address votingEscrow, address distributor) external onlyMaster {
+    function createLock(uint value, uint unlockTime) external onlyMaster {
         // Only callable from the parent contract, transfer tokens from user -> parent, parent -> VE
         // Single-use approval system
-        if(IERC20(LOCK_TOKEN).allowance(address(this), votingEscrow) != MAX_INT) {
-            IERC20(LOCK_TOKEN).approve(votingEscrow, MAX_INT);
+        if(IERC20(LOCK_TOKEN).allowance(address(this), VOTING_ESCROW) != MAX_INT) {
+            IERC20(LOCK_TOKEN).approve(VOTING_ESCROW, MAX_INT);
         }
         // Create the lock
-        IVotingEscrow(votingEscrow).create_lock(value, unlockTime);
-        IYieldDistributor(distributor).checkpoint();
+        IVotingEscrow(VOTING_ESCROW).create_lock(value, unlockTime);
+        IYieldDistributor(DISTRIBUTOR).checkpoint();
         _cleanMemory();
     }
 
-    function increaseAmount(uint value, address votingEscrow) external onlyMaster {
-        IVotingEscrow(votingEscrow).increase_amount(value);
+    function increaseAmount(uint value) external onlyMaster {
+        IVotingEscrow(VOTING_ESCROW).increase_amount(value);
+        IYieldDistributor(DISTRIBUTOR).checkpoint();
         _cleanMemory();
     }
 
-    function increaseUnlockTime(uint unlockTime, address votingEscrow) external onlyMaster {
-        IVotingEscrow(votingEscrow).increase_unlock_time(unlockTime);
+    function increaseUnlockTime(uint unlockTime) external onlyMaster {
+        IVotingEscrow(VOTING_ESCROW).increase_unlock_time(unlockTime);
+        IYieldDistributor(DISTRIBUTOR).checkpoint();
         _cleanMemory();
     }
 
-    function withdraw(address votingEscrow) external onlyMaster {
-        address token = IVotingEscrow(votingEscrow).token();
-        IVotingEscrow(votingEscrow).withdraw();
-        uint bal = IERC20(token).balanceOf(address(this));
-        IERC20(token).safeTransfer(MASTER, bal);
+    function withdraw() external onlyMaster {
+        IVotingEscrow(VOTING_ESCROW).withdraw();
+        uint bal = IERC20(LOCK_TOKEN).balanceOf(address(this));
+        IERC20(LOCK_TOKEN).safeTransfer(MASTER, bal);
         _cleanMemory();
     }
 
@@ -78,7 +79,7 @@ contract VestedEscrowSmartWallet {
         address rewards, 
         uint performanceFee
     ) external onlyMaster {
-        IDistributor(DISTRIBUTOR).getYield();
+        IYieldDistributor(DISTRIBUTOR).getYield();
         uint bal = IERC20(REWARD_TOKEN).balanceOf(address(this));
         uint fee = bal * performanceFee / PERCENTAGE;
         bal -= fee;
