@@ -157,7 +157,7 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
         SmartWalletWhitelistV2(IVotingEscrow(VOTING_ESCROW).smart_wallet_checker()).approveWallet(smartWallAdd);
 
         // We deposit our funds into the wallet
-        wallet.createLock(amountToLock, endTime, VOTING_ESCROW, DISTRIBUTOR);
+        wallet.createLock(amountToLock, endTime);
         emit DepositERC20OutputReceiver(msg.sender, TOKEN, amountToLock, fnftId, abi.encode(smartWallAdd));
     }
 
@@ -183,7 +183,7 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
         SmartWalletWhitelistV2(IVotingEscrow(VOTING_ESCROW).smart_wallet_checker()).approveWallet(smartWallAdd);
 
          // We deposit our funds into the wallet
-        wallet.createLock(amountToLock, endTime, VOTING_ESCROW, DISTRIBUTOR);
+        wallet.createLock(amountToLock, endTime);
         emit DepositERC20OutputReceiver(msg.sender, TOKEN, amountToLock, fnftId, abi.encode(smartWallAdd));
     }
 
@@ -201,7 +201,11 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
         address smartWallAdd = Clones.cloneDeterministic(TEMPLATE, keccak256(abi.encode(TOKEN, fnftId)));
         VestedEscrowSmartWallet wallet = VestedEscrowSmartWallet(smartWallAdd);
 
-        wallet.withdraw(VOTING_ESCROW);
+        //claim yield & fee
+        wallet.claimRewards(owner, ADMIN_WALLET, PERFORMANCE_FEE);
+
+        //withdraw fund
+        wallet.withdraw();
         uint balance = IERC20(TOKEN).balanceOf(address(this));
         IERC20(TOKEN).safeTransfer(owner, balance);
 
@@ -230,7 +234,7 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
         require(expiration - block.timestamp <= MAX_LOCKUP, 'Max lockup is 4 years');
         address smartWallAdd = Clones.cloneDeterministic(TEMPLATE, keccak256(abi.encode(TOKEN, fnftId)));
         VestedEscrowSmartWallet wallet = VestedEscrowSmartWallet(smartWallAdd);
-        wallet.increaseUnlockTime(expiration, VOTING_ESCROW);
+        wallet.increaseUnlockTime(expiration);
     }
 
     /// Prerequisite: User has approved this contract to spend tokens on their behalf
@@ -238,7 +242,7 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
         address smartWallAdd = Clones.cloneDeterministic(TEMPLATE, keccak256(abi.encode(TOKEN, fnftId)));
         VestedEscrowSmartWallet wallet = VestedEscrowSmartWallet(smartWallAdd);
         IERC20(TOKEN).safeTransferFrom(caller, smartWallAdd, amountToDeposit);
-        wallet.increaseAmount(amountToDeposit, VOTING_ESCROW);
+        wallet.increaseAmount(amountToDeposit);
     }
 
     // Not applicable
@@ -249,21 +253,20 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
         uint fnftId,
         bytes memory
     ) external override onlyTokenHolder(fnftId) {
-        address rewardsAdd = IAddressRegistry(addressRegistry).getRewardsHandler();
         address smartWallAdd = Clones.cloneDeterministic(TEMPLATE, keccak256(abi.encode(TOKEN, fnftId)));
         VestedEscrowSmartWallet wallet = VestedEscrowSmartWallet(smartWallAdd);
-        wallet.claimRewards(msg.sender, rewardsAdd, PERFORMANCE_FEE);
+        wallet.claimRewards(msg.sender, ADMIN_WALLET, PERFORMANCE_FEE);
     }       
 
     function proxyExecute(
         uint fnftId,
         address destination,
         bytes memory data
-    ) external onlyTokenHolder(fnftId) returns (bytes memory dataOut) {
+    ) external onlyTokenHolder(fnftId) payable returns (bytes memory dataOut) {
         require(globalProxyEnabled || proxyEnabled[fnftId], 'Proxy access not enabled!');
         address smartWallAdd = Clones.cloneDeterministic(TEMPLATE, keccak256(abi.encode(TOKEN, fnftId)));
         VestedEscrowSmartWallet wallet = VestedEscrowSmartWallet(smartWallAdd);
-        dataOut = wallet.proxyExecute(destination, data);
+        dataOut = wallet.proxyExecute{value: msg.value}(destination, data);
         wallet.cleanMemory();
     }
 
