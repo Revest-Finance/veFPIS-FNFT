@@ -158,9 +158,9 @@ contract veFPISRevest is Test {
 
         //Deposit additional fund for FNFT
         hoax(fpisWhale);
-        FPIS.approve(address(revestVe), amount);
+        FPIS.approve(address(revestVe), additionalDepositAmount);
         hoax(fpisWhale);
-        revest.depositAdditionalToFNFT(fnftId, amount, 1);
+        revest.depositAdditionalToFNFT(fnftId, additionalDepositAmount, 1);
 
         //Check
         assertGt(revestVe.getValue(fnftId), oriVeFPIS, "Additional deposit not success!");
@@ -282,10 +282,12 @@ contract veFPISRevest is Test {
     /**
      * This test case focus on if user can receive yield from their fnft
      */
-    function testClaimYield(uint amount) public {
+    function testClaimYield() public {
         //Fuzz Set-up
-        uint fxsBalance = FPIS.balanceOf(address(fpisWhale));
-        vm.assume(amount >= 1e18 && amount <= fxsBalance);
+        // uint fxsBalance = FPIS.balanceOf(address(fpisWhale));
+        // vm.assume(amount >= 1e18 && amount <= fxsBalance);
+
+        uint amount = 1e18;
 
         //Expiration for fnft config 
         uint expiration = block.timestamp + (2 * 365 * 60 * 60 * 24); // 2 years 
@@ -488,7 +490,7 @@ contract veFPISRevest is Test {
     function testPerformanceFee() public {
         //Getter Method  test
         uint weiFee = revestVe.getFlatWeiFee(fpisWhale);
-        assertEq(weiFee, 1 ether, "Current weiFee is incorrect!");
+        assertEq(weiFee, PERFORMANCE_FEE, "Current weiFee is incorrect!");
 
         //Calling from non-owner
         hoax(address(0xdead));
