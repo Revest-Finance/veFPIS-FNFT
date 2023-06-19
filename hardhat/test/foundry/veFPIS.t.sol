@@ -50,6 +50,9 @@ contract veFPISRevest is Test {
 
 
     function setUp() public {
+        uint fork1 = vm.createFork("https://mainnet.infura.io/v3/08cfb263de5249ba9bb25868d93d0d45", 17389890);
+        vm.selectFork(fork1);
+
         revestVe  = new RevestVeFPIS(PROVIDER, VOTING_ESCROW, DISTRIBUTOR, admin);
         smartWalletChecker = new SmartWalletWhitelistV2(admin);
         
@@ -77,8 +80,8 @@ contract veFPISRevest is Test {
      */
     function testMint(uint amount) public {
         //Fuzz Set-up
-        uint fxsBalance = FPIS.balanceOf(address(fpisWhale));
-        vm.assume(amount >= 1e18 && amount <= fxsBalance);
+        uint fpisBalance = FPIS.balanceOf(address(fpisWhale));
+        vm.assume(amount >= 1e18 && amount <= fpisBalance);
 
         //expiration for fnft config 
         uint expiration = block.timestamp + (2 * 365 * 60 * 60 * 24); // 2 years 
@@ -106,8 +109,8 @@ contract veFPISRevest is Test {
      */
     function testReceiveManagementFee(uint amount) public {
         //Fuzz Set-up
-        uint fxsBalance = FPIS.balanceOf(address(fpisWhale));
-        vm.assume(amount >= 1e18 && amount <= fxsBalance);
+        uint fpisBalance = FPIS.balanceOf(address(fpisWhale));
+        vm.assume(amount >= 1e18 && amount <= fpisBalance);
 
         //Expiration for fnft config 
         uint expiration = block.timestamp + (2 * 365 * 60 * 60 * 24); // 2 years 
@@ -282,12 +285,10 @@ contract veFPISRevest is Test {
     /**
      * This test case focus on if user can receive yield from their fnft
      */
-    function testClaimYield() public {
+    function testClaimYield(uint amount) public {
         //Fuzz Set-up
-        // uint fxsBalance = FPIS.balanceOf(address(fpisWhale));
-        // vm.assume(amount >= 1e18 && amount <= fxsBalance);
-
-        uint amount = 1e18;
+        uint fpisBalance = FPIS.balanceOf(address(fpisWhale));
+        vm.assume(amount >= 1e18 && amount <= fpisBalance);
 
         //Expiration for fnft config 
         uint expiration = block.timestamp + (2 * 365 * 60 * 60 * 24); // 2 years 
@@ -300,11 +301,11 @@ contract veFPISRevest is Test {
         smartWalletAddress = revestVe.getAddressForFNFT(fnftId);
 
         //Original balance of FXS before claiming yield
-        uint oriFXS = FPIS.balanceOf(fpisWhale);
+        uint oriFPIS = FPIS.balanceOf(fpisWhale);
         uint oriFeeReceived = FPIS.balanceOf(address(admin));
 
         //Skipping one years of timestamp
-        uint timeSkip = (1 * 365 * 60 * 60 * 24 + 1); //s 2 years
+        uint timeSkip = (1 * 365 * 60 * 60 * 24 + 1); // 1 year
         skip(timeSkip);
 
         //Destroy the address of smart wallet for testing purpose
@@ -319,7 +320,7 @@ contract veFPISRevest is Test {
         revestVe.triggerOutputReceiverUpdate(fnftId, bytes(""));
         
         //Balance of FXS after claiming yield
-        uint curFXS = FPIS.balanceOf(fpisWhale);
+        uint curFPIS = FPIS.balanceOf(fpisWhale);
         uint curFeeReceived = FPIS.balanceOf(address(admin));
 
         //Performance Fee
@@ -327,15 +328,15 @@ contract veFPISRevest is Test {
 
         //Checker
         assertGt(yieldToClaim, 0, "Yield should be greater than 0!");
-        assertEq(curFXS, oriFXS + yieldToClaim - performanceFee, "Does not receive enough yield!");
+        assertEq(curFPIS, oriFPIS + yieldToClaim - performanceFee, "Does not receive enough yield!");
         assertGt(curFeeReceived, oriFeeReceived, "Admin does not receieve performance fee!");
 
         //Console
         console.log("Yield to claim: ", yieldToClaim);
-        console.log("Original balance of FPIS from user: ", oriFXS);
+        console.log("Original balance of FPIS from user: ", oriFPIS);
         console.log("Original balance of FPIS from rewardHandler: ", oriFeeReceived);
         console.log("Performance fee: ", performanceFee);
-        console.log("Current balance of FPIS from userS: ", curFXS);
+        console.log("Current balance of FPIS from userS: ", curFPIS);
         console.log("Current balance of FPIS from rewardHandler: ", curFeeReceived);
     }
 
