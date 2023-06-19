@@ -19,7 +19,7 @@ interface Revest {
 }
 
 contract veFPISRevest is Test {
-    address public Provider = 0xd2c6eB7527Ab1E188638B86F2c14bbAd5A431d78;
+    address public PROVIDER = 0xd2c6eB7527Ab1E188638B86F2c14bbAd5A431d78;
     address public WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address public VOTING_ESCROW = 0x574C154C83432B0A45BA3ad2429C3fA242eD7359; //TODO: change to veFPIS 
     address public DISTRIBUTOR = 0xE6D31C144BA99Af564bE7E81261f7bD951b802F6; 
@@ -38,6 +38,11 @@ contract veFPISRevest is Test {
     address admin = makeAddr("admin");
     address fpisWhale = 0x89623FBA59e54c9863346b4d27F0f86369Da11E5;
 
+    uint MANAGEMENT_FEE = 5;
+    uint PERFORMANCE_FEE = 100;
+
+    uint immutable PERCENTAGE = 1000;
+
     uint fnftId;
     uint fnftId2;
 
@@ -45,7 +50,7 @@ contract veFPISRevest is Test {
 
 
     function setUp() public {
-        revestVe  = new RevestVeFPIS(Provider, VOTING_ESCROW, DISTRIBUTOR, admin);
+        revestVe  = new RevestVeFPIS(PROVIDER, VOTING_ESCROW, DISTRIBUTOR, admin);
         smartWalletChecker = new SmartWalletWhitelistV2(admin);
         
         hoax(admin, admin);
@@ -70,12 +75,13 @@ contract veFPISRevest is Test {
     /**
      * This test case focus on if the user is able to mint the FNFT after deposit 1 token of FPIS into veFPIS 
      */
-    function testMint() public {
-        uint time = block.timestamp;
-    
-        //Outline the parameters that will govern the FNFT
-        uint expiration = time + (2 * 365 * 60 * 60 * 24); // 2 years 
-        uint amount = 1.1e18; //FPIS 
+    function testMint(uint amount) public {
+        //Fuzz Set-up
+        uint fxsBalance = FPIS.balanceOf(address(fpisWhale));
+        vm.assume(amount >= 1e18 && amount <= fxsBalance);
+
+        //expiration for fnft config 
+        uint expiration = block.timestamp + (2 * 365 * 60 * 60 * 24); // 2 years 
 
         //Mint the FNFT
         hoax(fpisWhale);
@@ -87,7 +93,7 @@ contract veFPISRevest is Test {
         smartWalletAddress = revestVe.getAddressForFNFT(fnftId);
 
         //Check
-        assert(expectedValue >= 2e18);
+        assertGt(expectedValue, 2e18, "Deposit value is lower than expected!");
 
         //Logging
         console.log("veFPIS balance should be around 2e18: ", expectedValue);
@@ -96,13 +102,46 @@ contract veFPISRevest is Test {
     }
 
     /**
+     * This test case focus on if the admin can receive the management fee up front
+     */
+    function testReceiveManagementFee(uint amount) public {
+        //Fuzz Set-up
+        uint fxsBalance = FPIS.balanceOf(address(fpisWhale));
+        vm.assume(amount >= 1e18 && amount <= fxsBalance);
+
+        //Expiration for fnft config 
+        uint expiration = block.timestamp + (2 * 365 * 60 * 60 * 24); // 2 years 
+
+        //Balance of admin before the minting the lock
+        uint oriBal = FPIS.balanceOf(address(admin));
+
+        //Minting the FNFT
+        hoax(fpisWhale);
+        FPIS.approve(address(revestVe), amount);
+        hoax(fpisWhale);
+        fnftId = revestVe.createNewLock(expiration, amount);
+
+        //Check
+        uint expectedFee = amount * MANAGEMENT_FEE / PERCENTAGE;
+        assertEq(FPIS.balanceOf(address(admin)), expectedFee, "Amount of fee received is incorrect!"); //10% fee of amount 1e18 is 1e17
+
+        //Logging
+        console.log("FPIS balance of revest admin before minting: ", oriBal);
+        console.log("FPIS balance of revest admin after minting: ", FPIS.balanceOf(address(admin)));
+    }
+
+    /**
      * This test case focus on if user can deposit additional amount into the vault
      */
-    function testDepositAdditional() public {
-        // Outline the parameters that will govern the FNFT
-        uint time = block.timestamp;
-        uint expiration = time + (2 * 365 * 60 * 60 * 24); // 2 years 
-        uint amount = 1e18; //FPIS  
+    function testDepositAdditional(uint amount, uint additionalDepositAmount) public {
+        //Fuzz Set-up
+        uint fpisBalance = FPIS.balanceOf(address(fpisWhale));
+        vm.assume(amount >= 1e18 && amount <= fpisBalance);
+        uint additionalDepositMax = fpisBalance - amount;
+        vm.assume(additionalDepositAmount >0 && additionalDepositAmount <=additionalDepositMax);
+
+        //Expiration for fnft config 
+        uint expiration = block.timestamp + (2 * 365 * 60 * 60 * 24); // 2 years 
 
         //Minting the FNFT
         hoax(fpisWhale);
@@ -124,7 +163,7 @@ contract veFPISRevest is Test {
         revest.depositAdditionalToFNFT(fnftId, amount, 1);
 
         //Check
-        assert(revestVe.getValue(fnftId) > oriVeFPIS);
+        assertGt(revestVe.getValue(fnftId), oriVeFPIS, "Additional deposit not success!");
 
         //Logging
         console.log("Original veFPIS balance in Smart Wallet: ", oriVeFPIS);
@@ -147,8 +186,12 @@ contract veFPISRevest is Test {
         fnftId = revestVe.createNewLock(expiration, amount);
         smartWalletAddress = revestVe.getAddressForFNFT(fnftId);
 
+        //Checking initial maturity of the lock after deposit
+        ILockManager lockManager = ILockManager(IAddressRegistry(PROVIDER).getLockManager());
+        uint initialMaturity = lockManager.fnftIdToLock(fnftId).timeLockExpiry;
+
         //Skipping two weeks of timestamp
-        uint timeSkip = (2 * 7 * 60 * 60 * 24); // 2 week years
+        uint timeSkip = (2 * 7 * 60 * 60 * 24); // 2 years
         skip(timeSkip);
 
         //Destroy the address of smart wallet for testing purpose
@@ -167,16 +210,26 @@ contract veFPISRevest is Test {
         //Attempt to extend FNFT Maturity
         hoax(fpisWhale);
         revest.extendFNFTMaturity(fnftId, expiration);
+
+        //Checking after-extend maturity of the lock after deposit
+        uint currentMaturity = lockManager.fnftIdToLock(fnftId).timeLockExpiry;
+
+        //Check
+        assertGt(currentMaturity, initialMaturity, "Maturity has not been changed!");
+
+        //Locking
+        console.log("Initual Maturity: ", initialMaturity);
+        console.log("Current Maturity: ", currentMaturity);
     }
 
     /**
-     * This test case focus on if user can unlock and withdaw their fnft
+     * This test case focus on if user can unlock and withdaw their fnft, and plus claim fee
      */
     function testUnlockAndWithdraw() public {
         // Outline the parameters that will govern the FNFT
         uint time = block.timestamp;
         uint expiration = time + (2 * 365 * 60 * 60 * 24); // 2 years 
-        uint amount = 1e18; //FPIS  
+        uint amount = 1e18; //FXS  
 
         //Minting the FNFT
         hoax(fpisWhale);
@@ -185,40 +238,57 @@ contract veFPISRevest is Test {
         fnftId = revestVe.createNewLock(expiration, amount);
         smartWalletAddress = revestVe.getAddressForFNFT(fnftId);
 
-        //Original balance of FPIS after depositing the FNFT
-        uint oriFPIS = FPIS.balanceOf(fpisWhale);
+        //Original balance of FXS and after depositing the FNFT
+        uint oriFXS = FPIS.balanceOf(fpisWhale);
+        uint oriFeeReceived = FPIS.balanceOf(address(admin));
 
         //Destroying teh address of smart wallet for testing purpose
         destroyAccount(smartWalletAddress, address(admin));
 
         //Skipping two weeks of timestamp
-        uint timeSkip = (2 * 365 * 60 * 60 * 24 + 1); // 2 week years
+        uint timeSkip = (2 * 365 * 60 * 60 * 24 + 1); // 2 years
         skip(timeSkip);
         
-         //Destroy the address of smart wallet for testing purpose
+        //Destroy the address of smart wallet for testing purpose
         destroyAccount(smartWalletAddress, address(admin));
+
+        //Yield Claim check
+        hoax(fpisWhale);
+        uint yieldToClaim = IYieldDistributor(DISTRIBUTOR).earned(smartWalletAddress);
 
         //Unlocking and withdrawing the NFT
         hoax(fpisWhale);
         revest.withdrawFNFT(fnftId, 1);
-        uint currentFPIS = FPIS.balanceOf(fpisWhale);
+        
+        //Balance of FXS after claiming yield
+        uint curFXS = FPIS.balanceOf(fpisWhale);
+        uint curFeeReceived = FPIS.balanceOf(address(admin));
+
+        // Fee
+        uint performanceFee = yieldToClaim * PERFORMANCE_FEE / PERCENTAGE;
+        uint managementFee = amount * MANAGEMENT_FEE / PERCENTAGE;
 
         //Check
-        assertEq(currentFPIS - oriFPIS, 1e18);
+        assertEq(curFXS, oriFXS + amount + yieldToClaim - performanceFee - managementFee, "Does not receive enough yield!");
+        assertGt(curFeeReceived, oriFeeReceived, "Admin does not receieve performance fee!");
 
-        //Value check
-        console.log("Original balance of FPIS: ", oriFPIS);
-        console.log("Current balance of FPIS: ", currentFPIS);
+        //Logging
+        console.log("Original balance of FXS: ", oriFXS);
+        console.log("Current balance of FXS: ", curFXS);
+        console.log("Performance Fee: ", performanceFee);
+        console.log("Management Fee: ", managementFee);
     }
 
     /**
-     * This test case focus on if user can receive yield from their fnft and if we receive fee 
+     * This test case focus on if user can receive yield from their fnft
      */
-    function testClaimYield() public {
-        // Outline the parameters that will govern the FNFT
-        uint time = block.timestamp;
-        uint expiration = time + (2 * 365 * 60 * 60 * 24); // 2 years 
-        uint amount = 1e18; //FXS  
+    function testClaimYield(uint amount) public {
+        //Fuzz Set-up
+        uint fxsBalance = FPIS.balanceOf(address(fpisWhale));
+        vm.assume(amount >= 1e18 && amount <= fxsBalance);
+
+        //Expiration for fnft config 
+        uint expiration = block.timestamp + (2 * 365 * 60 * 60 * 24); // 2 years 
 
         //Minting the FNFT and Checkpoint for Yield Distributor
         hoax(fpisWhale);
@@ -226,11 +296,10 @@ contract veFPISRevest is Test {
         hoax(fpisWhale);
         fnftId = revestVe.createNewLock(expiration, amount);
         smartWalletAddress = revestVe.getAddressForFNFT(fnftId);
-        // hoax(fxsWhale);
-        // IYieldDistributor(DISTRIBUTOR).checkpointOtherUser(smartWalletAddress);
 
         //Original balance of FXS before claiming yield
-        uint oriFPIS = FPIS.balanceOf(fpisWhale);
+        uint oriFXS = FPIS.balanceOf(fpisWhale);
+        uint oriFeeReceived = FPIS.balanceOf(address(admin));
 
         //Skipping one years of timestamp
         uint timeSkip = (1 * 365 * 60 * 60 * 24 + 1); //s 2 years
@@ -248,21 +317,24 @@ contract veFPISRevest is Test {
         revestVe.triggerOutputReceiverUpdate(fnftId, bytes(""));
         
         //Balance of FXS after claiming yield
-        uint curFPIS = FPIS.balanceOf(fpisWhale);
+        uint curFXS = FPIS.balanceOf(fpisWhale);
+        uint curFeeReceived = FPIS.balanceOf(address(admin));
 
-        //Balance of Revest Reward REceive Address:
-        address revestRewardReceiver = 0xA4E7f2a1EDB5AD886baA09Fb258F8ACA7c934ba6;
-        uint feeFPIS = FPIS.balanceOf(revestRewardReceiver);
+        //Performance Fee
+        uint performanceFee = yieldToClaim * PERFORMANCE_FEE / PERCENTAGE;
 
         //Checker
-        assertGt(yieldToClaim, 0);
-        assertGt(feeFPIS, 0);
-        assertEq(curFPIS, oriFPIS + yieldToClaim - feeFPIS);
+        assertGt(yieldToClaim, 0, "Yield should be greater than 0!");
+        assertEq(curFXS, oriFXS + yieldToClaim - performanceFee, "Does not receive enough yield!");
+        assertGt(curFeeReceived, oriFeeReceived, "Admin does not receieve performance fee!");
 
         //Console
         console.log("Yield to claim: ", yieldToClaim);
-        console.log("Original balance of FPIS: ", oriFPIS);
-        console.log("Current balance of FPIS: ", curFPIS);
+        console.log("Original balance of FPIS from user: ", oriFXS);
+        console.log("Original balance of FPIS from rewardHandler: ", oriFeeReceived);
+        console.log("Performance fee: ", performanceFee);
+        console.log("Current balance of FPIS from userS: ", curFXS);
+        console.log("Current balance of FPIS from rewardHandler: ", curFeeReceived);
     }
 
     /**
@@ -309,9 +381,9 @@ contract veFPISRevest is Test {
         uint smartWalletBalanceAfterMigrate = veFPIS.balanceOf(smartWalletAddress);
 
         //Checker
-        assertGt(userVeBalanceBeforeMigrate, 0);
-        assertEq(userVeBalanceAfterMigrate, 0);
-        assertEq(smartWalletBalanceAfterMigrate, userVeBalanceBeforeMigrate);
+        assertGt(userVeBalanceBeforeMigrate, 0, "User has not locked FPIS!");
+        assertEq(userVeBalanceAfterMigrate, 0, "veFPIS has not been transfered/ completely transfered!");
+        assertEq(smartWalletBalanceAfterMigrate, userVeBalanceBeforeMigrate, "Amount of veFPIS does not match between the smart wallet and the before-migrate lock!");
 
         //Logging
         console.log("veFPIS balance of user before migrate: ", userVeBalanceBeforeMigrate);
@@ -353,11 +425,11 @@ contract veFPISRevest is Test {
         string memory expectedRewardsDesc = string(abi.encodePacked(par1, par2));
 
         //checker
-        assertEq(adr, smartWalletAddress);
-        assertEq(rewardDesc, expectedRewardsDesc);
-        assertEq(hasRewards, yieldToClaim > 0);
-        assertEq(token, address(FPIS));
-        assertEq(lockedBalance, 1e18);
+        assertEq(adr, smartWalletAddress, "Encoded address is incorrect!");
+        assertEq(rewardDesc, expectedRewardsDesc, "Reward description is incorrect!");
+        assertEq(hasRewards, yieldToClaim > 0, "Encoded hasRewards is incorrect!");
+        assertEq(token, address(FPIS), "Encoded vault token is incorrect!");
+        assertEq(lockedBalance, 995000000000000000, "Encoded locked balance is incorrect!"); // 95% of amount, (5% of management fee)
 
         //Logging
         console.log(adr);
@@ -376,7 +448,7 @@ contract veFPISRevest is Test {
     function testAddressRegistry() public {
         //Getter Method test
         address addressRegistry = revestVe.getAddressRegistry();
-        assertEq(addressRegistry, Provider, "Address Registry is incorrect!");
+        assertEq(addressRegistry, PROVIDER, "Address Registry is incorrect!");
 
         //Calling from non-owner
         hoax(address(0xdead));
@@ -392,7 +464,7 @@ contract veFPISRevest is Test {
 
     function testRevestAdmin() public {
         //Getter Method test
-        address revestAdmin = revestVe.ADMIN();
+        address revestAdmin = revestVe.ADMIN_WALLET();
         assertEq(revestAdmin, admin, "Revest Admin is incorrect!");
 
         //Calling from non-owner
@@ -403,7 +475,7 @@ contract veFPISRevest is Test {
         //Setter Method test
         hoax(revestVe.owner());
         revestVe.setRevestAdmin(address(0xdead));
-        address newAddressRegistry = revestVe.ADMIN();
+        address newAddressRegistry = revestVe.ADMIN_WALLET();
         assertEq(newAddressRegistry, address(0xdead), "New revest admin is not set correctly");
     }
 
@@ -413,7 +485,7 @@ contract veFPISRevest is Test {
         assertEq(asset, VOTING_ESCROW, "Asset/Underlying Ve contract is incorrect");
     }
 
-    function testWeiFee() public {
+    function testPerformanceFee() public {
         //Getter Method  test
         uint weiFee = revestVe.getFlatWeiFee(fpisWhale);
         assertEq(weiFee, 1 ether, "Current weiFee is incorrect!");
@@ -421,19 +493,30 @@ contract veFPISRevest is Test {
         //Calling from non-owner
         hoax(address(0xdead));
         vm.expectRevert("Ownable: caller is not the owner");
-        revestVe.setWeiFee(2 ether);
+        revestVe.setPerformanceFee(2 ether);
         
          //Setter Method test
         hoax(revestVe.owner());
-        revestVe.setWeiFee(2 ether);
+        revestVe.setPerformanceFee(2 ether);
         uint newWeiFee = revestVe.getFlatWeiFee(fpisWhale);
         assertEq(newWeiFee, 2 ether, "New wei fei is not set correctly");
     }
 
-    function testERC20Fee() public {
+    function testManagementFee() public {
         //Getter Method
         uint fee = revestVe.getERC20Fee(fpisWhale);
-        assertEq(fee, 0, "Current fee percentage is incorrect!"); 
+        assertEq(fee, MANAGEMENT_FEE, "Current fee percentage is incorrect!"); //10%
+
+        //Calling from non-owner
+        hoax(address(0xdead));
+        vm.expectRevert("Ownable: caller is not the owner");
+        revestVe.setManagementFee(20);
+ 
+        //Setter Method test
+        hoax(revestVe.owner());
+        revestVe.setManagementFee(20);
+        uint newFee = revestVe.getERC20Fee(fpisWhale);
+        assertEq(newFee, 20, "New fee percentage is not set correctly!");
     }
 
     function testMetaData() public {
