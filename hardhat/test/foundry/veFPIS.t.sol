@@ -21,7 +21,7 @@ interface Revest {
 contract veFPISRevest is Test {
     address public PROVIDER = 0xd2c6eB7527Ab1E188638B86F2c14bbAd5A431d78;
     address public WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
-    address public VOTING_ESCROW = 0x574C154C83432B0A45BA3ad2429C3fA242eD7359; //TODO: change to veFPIS 
+    address public VOTING_ESCROW = 0x574C154C83432B0A45BA3ad2429C3fA242eD7359;
     address public DISTRIBUTOR = 0xE6D31C144BA99Af564bE7E81261f7bD951b802F6; 
     address public constant REWARD_TOKEN = 0xc2544A32872A91F4A553b404C6950e89De901fdb;
 
@@ -126,7 +126,7 @@ contract veFPISRevest is Test {
 
         //Check
         uint expectedFee = amount * MANAGEMENT_FEE / PERCENTAGE;
-        assertEq(FPIS.balanceOf(address(admin)), expectedFee, "Amount of fee received is incorrect!"); //10% fee of amount 1e18 is 1e17
+        assertEq(FPIS.balanceOf(address(admin)), expectedFee, "Amount of fee received is incorrect!"); 
 
         //Logging
         console.log("FPIS balance of revest admin before minting: ", oriBal);

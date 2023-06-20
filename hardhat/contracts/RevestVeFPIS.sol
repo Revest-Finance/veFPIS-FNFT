@@ -32,8 +32,9 @@ interface IWETH {
 }
 
 /**
- * @title SpiritSwap <> Revest integration for tokenizing inSPIRIT positions
+ * @title Revest FNFT for veFPIS 
  * @author RobAnon
+ * @author Ekkila
  * @dev 
  */
 contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, ReentrancyGuard {
