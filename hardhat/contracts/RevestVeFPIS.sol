@@ -83,14 +83,6 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
     //Management Fee
     uint private MANAGEMENT_FEE = 5;
 
-    // For tracking if a given contract has approval for token
-    mapping (address => mapping (address => bool)) private approvedContracts;
-
-    // For tracking wallet approvals for tokens
-    // Works for up to 256 tokens
-    mapping (address => mapping (uint => uint)) private walletApprovals;
-
-
     // Control variable to let all users utilize smart wallets for proxy execution
     bool public globalProxyEnabled;
 
