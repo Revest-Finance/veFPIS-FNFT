@@ -56,6 +56,9 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
      // Revest Admin Account 
     address public ADMIN_WALLET;
 
+     // Vault address
+    address public immutable VAULT;
+
     // veFPIS token    
     address public constant REWARD_TOKEN = 0xc2544A32872A91F4A553b404C6950e89De901fdb;
 
@@ -98,6 +101,7 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
         VestedEscrowSmartWallet wallet = new VestedEscrowSmartWallet(_vE, _distro);
         TEMPLATE = address(wallet);
         ADMIN_WALLET = _revestAdmin;
+        VAULT =  IAddressRegistry(_provider).getTokenVault();
     }
 
     modifier onlyRevestController() {
@@ -188,8 +192,7 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
         uint
     ) external override nonReentrant {
         // Security check to make sure the Revest vault is the only contract that can call this method
-        address vault = IAddressRegistry(addressRegistry).getTokenVault();
-        require(_msgSender() == vault, 'E016');
+        require(_msgSender() == VAULT, 'E016');
 
         address smartWallAdd = Clones.cloneDeterministic(TEMPLATE, keccak256(abi.encode(TOKEN, fnftId)));
         VestedEscrowSmartWallet wallet = VestedEscrowSmartWallet(smartWallAdd);
