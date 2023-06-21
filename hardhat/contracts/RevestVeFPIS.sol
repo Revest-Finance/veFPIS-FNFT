@@ -240,7 +240,7 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
 
         //Taking management fee
         uint fxsFee = amountToDeposit * MANAGEMENT_FEE / PERCENTAGE; // Make constant
-        IERC20(TOKEN).safeTransferFrom(msg.sender, ADMIN_WALLET, fxsFee);
+        IERC20(TOKEN).safeTransferFrom(caller, ADMIN_WALLET, fxsFee);
         amountToDeposit -= fxsFee;
 
         IERC20(TOKEN).safeTransferFrom(caller, smartWallAdd, amountToDeposit);
