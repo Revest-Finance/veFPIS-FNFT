@@ -97,6 +97,7 @@ contract veFPISRevest is Test {
 
         //Check
         assertGt(expectedValue, 2e18, "Deposit value is lower than expected!");
+        assertEq(FPIS.balanceOf(fpisWhale), fpisBalance - amount, "FPIS balance is not correct!");
 
         //Logging
         console.log("veFPIS balance should be around 2e18: ", expectedValue);
@@ -127,6 +128,7 @@ contract veFPISRevest is Test {
         //Check
         uint expectedFee = amount * MANAGEMENT_FEE / PERCENTAGE;
         assertEq(FPIS.balanceOf(address(admin)), expectedFee, "Amount of fee received is incorrect!"); 
+        assertEq(FPIS.balanceOf(fpisWhale), fpisBalance - amount, "FPIS balance is not correct!");
 
         //Logging
         console.log("FPIS balance of revest admin before minting: ", oriBal);
@@ -164,6 +166,7 @@ contract veFPISRevest is Test {
         FPIS.approve(address(revestVe), additionalDepositAmount);
         hoax(fpisWhale);
         revest.depositAdditionalToFNFT(fnftId, additionalDepositAmount, 1);
+        destroyAccount(smartWalletAddress, address(admin));
 
         //Check
         assertGt(revestVe.getValue(fnftId), oriVeFPIS, "Additional deposit not success!");
@@ -171,16 +174,24 @@ contract veFPISRevest is Test {
         //Logging
         console.log("Original veFPIS balance in Smart Wallet: ", oriVeFPIS);
         console.log("New veFPIS balance in Smart Wallet: ", revestVe.getValue(fnftId));
+
+        //Skip 2 years
+        skip(52 weeks * 2 + 1 weeks);
+        startHoax(fpisWhale);
+        uint yieldToClaim = IYieldDistributor(DISTRIBUTOR).earned(smartWalletAddress);
+        assertGt(yieldToClaim, 0, "No yield to claim!");
+        revest.withdrawFNFT(fnftId, 1);
     }
 
     /**Jos
      * This test case focus on if user can extend the locking period on the vault
      */
-    function testExtendLockingPeriod() public {
+    function testExtendLockingPeriod(uint amount) public {
+        vm.assume(amount >= 1e18 && amount <= FPIS.balanceOf(fpisWhale));
         // Outline the parameters that will govern the FNFT
         uint time = block.timestamp;
         uint expiration = time + (2 * 365 * 60 * 60 * 24); // 2 years 
-        uint amount = 1e18; //FPIS  
+        // uint amount = 1e18; //FPIS  
 
         //Minting the FNFT
         hoax(fpisWhale);
@@ -213,12 +224,18 @@ contract veFPISRevest is Test {
         //Attempt to extend FNFT Maturity
         hoax(fpisWhale);
         revest.extendFNFTMaturity(fnftId, expiration);
+        destroyAccount(smartWalletAddress, address(admin));
 
         //Checking after-extend maturity of the lock after deposit
         uint currentMaturity = lockManager.fnftIdToLock(fnftId).timeLockExpiry;
 
         //Check
         assertGt(currentMaturity, initialMaturity, "Maturity has not been changed!");
+
+        //Skip 4 years to end of period
+        skip(52 weeks * 4 + 1 weeks);
+        hoax(fpisWhale);
+        revest.withdrawFNFT(fnftId, 1);
 
         //Locking
         console.log("Initual Maturity: ", initialMaturity);
@@ -228,11 +245,12 @@ contract veFPISRevest is Test {
     /**
      * This test case focus on if user can unlock and withdaw their fnft, and plus claim fee
      */
-    function testUnlockAndWithdraw() public {
+    function testUnlockAndWithdraw(uint amount) public {
+        vm.assume(amount >= 1e18 && amount <= FPIS.balanceOf(fpisWhale));
         // Outline the parameters that will govern the FNFT
         uint time = block.timestamp;
         uint expiration = time + (2 * 365 * 60 * 60 * 24); // 2 years 
-        uint amount = 1e18; //FXS  
+
 
         //Minting the FNFT
         hoax(fpisWhale);
