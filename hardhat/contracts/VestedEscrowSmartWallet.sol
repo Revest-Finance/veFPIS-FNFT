@@ -3,6 +3,9 @@
 import "./interfaces/IVotingEscrow.sol";
 import "./interfaces/IDistributor.sol";
 import "./interfaces/IRewardsHandler.sol";
+import "./interfaces/IYieldDistributor.sol";
+
+
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 
@@ -17,21 +20,22 @@ contract VestedEscrowSmartWallet {
 
     address private immutable MASTER;
 
-    address private immutable REWARD_TOKEN;
+    address private immutable LOCK_TOKEN;
 
-    address private immutable TOKEN;
+    address private immutable REWARD_TOKEN;
 
     address private immutable VOTING_ESCROW;
 
-    uint private constant feeNumerator = 10; // TODO: Make mutable
+    address private immutable DISTRIBUTOR;
 
-    uint private constant feeDenominator = 100;
+    uint private constant PERCENTAGE = 1000;
 
-    constructor(address _rewardToken, address _token, address _vE) {
+    constructor(address _votingEscrow, address _distributor) {
         MASTER = msg.sender;
-        REWARD_TOKEN = _rewardToken;
-        TOKEN = _token;
-        VOTING_ESCROW = _vE;
+        VOTING_ESCROW = _votingEscrow;
+        LOCK_TOKEN = IVotingEscrow(_votingEscrow).token();
+        REWARD_TOKEN = IVotingEscrow(_votingEscrow).token();
+        DISTRIBUTOR = _distributor;
     }
 
     modifier onlyMaster() {
@@ -42,51 +46,46 @@ contract VestedEscrowSmartWallet {
     function createLock(uint value, uint unlockTime) external onlyMaster {
         // Only callable from the parent contract, transfer tokens from user -> parent, parent -> VE
         // Single-use approval system
-        if(IERC20(TOKEN).allowance(address(this), VOTING_ESCROW) != MAX_INT) {
-            IERC20(TOKEN).approve(VOTING_ESCROW, MAX_INT);
+        if(IERC20(LOCK_TOKEN).allowance(address(this), VOTING_ESCROW) != MAX_INT) {
+            IERC20(LOCK_TOKEN).approve(VOTING_ESCROW, MAX_INT);
         }
         // Create the lock
         IVotingEscrow(VOTING_ESCROW).create_lock(value, unlockTime);
+        IYieldDistributor(DISTRIBUTOR).checkpoint();
         _cleanMemory();
     }
 
-    function increaseAmount(uint value, address votingEscrow) external onlyMaster {
-        IVotingEscrow(votingEscrow).increase_amount(value);
+    function increaseAmount(uint value) external onlyMaster {
+        IVotingEscrow(VOTING_ESCROW).increase_amount(value);
+        IYieldDistributor(DISTRIBUTOR).checkpoint();
         _cleanMemory();
     }
 
-    function increaseUnlockTime(uint unlockTime, address votingEscrow) external onlyMaster {
-        IVotingEscrow(votingEscrow).increase_unlock_time(unlockTime);
+    function increaseUnlockTime(uint unlockTime) external onlyMaster {
+        IVotingEscrow(VOTING_ESCROW).increase_unlock_time(unlockTime);
+        IYieldDistributor(DISTRIBUTOR).checkpoint();
         _cleanMemory();
     }
 
-    function withdraw(address votingEscrow) external onlyMaster {
-        address token = IVotingEscrow(votingEscrow).token();
-        IVotingEscrow(votingEscrow).withdraw();
-        uint bal = IERC20(token).balanceOf(address(this));
-        IERC20(token).safeTransfer(MASTER, bal);
+    function withdraw() external onlyMaster {
+        IVotingEscrow(VOTING_ESCROW).withdraw();
+        uint bal = IERC20(LOCK_TOKEN).balanceOf(address(this));
+        IERC20(LOCK_TOKEN).safeTransfer(MASTER, bal);
         _cleanMemory();
     }
 
     function claimRewards(
-        address distributor, 
         address caller, 
-        address rewards
+        address rewards, 
+        uint performanceFee
     ) external onlyMaster {
-        IDistributor(distributor).getYield();
+        IYieldDistributor(DISTRIBUTOR).getYield();
         uint bal = IERC20(REWARD_TOKEN).balanceOf(address(this));
-        uint fee = bal * feeNumerator / feeDenominator;
+        uint fee = bal * performanceFee / PERCENTAGE;
         bal -= fee;
-        IRewardsHandler(rewards).receiveFee(REWARD_TOKEN, fee);
+        IERC20(REWARD_TOKEN).safeTransfer(rewards, fee);
         IERC20(REWARD_TOKEN).safeTransfer(caller, bal);
         _cleanMemory();
-    }
-
-    // Proxy function for ease of use and gas-savings
-    function proxyApproveAll(address[] memory tokens, address spender) external onlyMaster {
-        for(uint i = 0; i < tokens.length; i++) {
-            IERC20(tokens[i]).approve(spender, MAX_INT);
-        }
     }
 
     /// Proxy function to send arbitrary messages. Useful for delegating votes and similar activities

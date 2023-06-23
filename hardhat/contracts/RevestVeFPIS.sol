@@ -32,11 +32,12 @@ interface IWETH {
 }
 
 /**
- * @title SpiritSwap <> Revest integration for tokenizing inSPIRIT positions
+ * @title Revest FNFT for veFPIS 
  * @author RobAnon
+ * @author Ekkila
  * @dev 
  */
-contract RevestSpiritSwap is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, ReentrancyGuard {
+contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, ReentrancyGuard {
     
     using SafeERC20 for IERC20;
 
@@ -52,11 +53,14 @@ contract RevestSpiritSwap is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, R
     // Distributor for rewards address
     address public DISTRIBUTOR;
 
-    // NFT Garage Admin Account 
-    address public ADMIN;
+     // Revest Admin Account 
+    address public ADMIN_WALLET;
 
-    // SPIRIT token    
-    address public constant REWARD_TOKEN = 0x5Cc61A78F164885776AA610fb0FE1257df78E59B;
+     // Vault address
+    address public immutable VAULT;
+
+    // veFPIS token    
+    address public constant REWARD_TOKEN = 0xc2544A32872A91F4A553b404C6950e89De901fdb;
 
     // Template address for VE wallets
     address public immutable TEMPLATE;
@@ -73,20 +77,14 @@ contract RevestSpiritSwap is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, R
 
     uint private constant FREE_AMOUNT = 100 ether;
 
-    // Fee tracker
-    uint private weiFee = 1 ether;
+    //Percentage
+    uint private constant PERCENTAGE = 1000;
 
-    // For tracking if a given contract has approval for token
-    mapping (address => mapping (address => bool)) private approvedContracts;
+    //Performance Fee
+    uint private PERFORMANCE_FEE = 100;
 
-    // For tracking wallet approvals for tokens
-    // Works for up to 256 tokens
-    mapping (address => mapping (uint => uint)) private walletApprovals;
-
-
-    // WFTM contract
-    address private constant WFTM = 0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83;
-
+    //Management Fee
+    uint private MANAGEMENT_FEE = 5;
 
     // Control variable to let all users utilize smart wallets for proxy execution
     bool public globalProxyEnabled;
@@ -95,15 +93,15 @@ contract RevestSpiritSwap is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, R
     mapping (uint => bool) public proxyEnabled;
 
     // Initialize the contract with the needed valeus
-    constructor(address _provider, address _vE, address _distro, address _spiritAdmin) {
+    constructor(address _provider, address _vE, address _distro, address _revestAdmin) {
         addressRegistry = _provider;
         VOTING_ESCROW = _vE;
-        address _token = IVotingEscrow(_vE).token();
-        TOKEN = _token;
-        VestedEscrowSmartWallet wallet = new VestedEscrowSmartWallet(REWARD_TOKEN, _token, _vE);
-        TEMPLATE = address(wallet);
         DISTRIBUTOR = _distro;
-        ADMIN = _spiritAdmin;
+        TOKEN = IVotingEscrow(_vE).token();
+        VestedEscrowSmartWallet wallet = new VestedEscrowSmartWallet(_vE, _distro);
+        TEMPLATE = address(wallet);
+        ADMIN_WALLET = _revestAdmin;
+        VAULT =  IAddressRegistry(_provider).getTokenVault();
     }
 
     modifier onlyRevestController() {
@@ -134,8 +132,15 @@ contract RevestSpiritSwap is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, R
     function createNewLock(
         uint endTime,
         uint amountToLock
-    ) external nonReentrant returns (uint fnftId) {    
+    ) external nonReentrant returns (uint fnftId) {
+        //Taking Management Fee
+        uint fxsFee = amountToLock * MANAGEMENT_FEE / PERCENTAGE; // Make constant
+        IERC20(TOKEN).safeTransferFrom(msg.sender, ADMIN_WALLET, fxsFee);
+        amountToLock -= fxsFee;
 
+        // TODO: Emit fee claimed event
+
+        //Mint FNFT
         fnftId = _mintFNFT(endTime);
         
         // We deploy the smart wallet
@@ -151,9 +156,9 @@ contract RevestSpiritSwap is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, R
         // We deposit our funds into the wallet
         wallet.createLock(amountToLock, endTime);
         emit DepositERC20OutputReceiver(msg.sender, TOKEN, amountToLock, fnftId, abi.encode(smartWallAdd));
-        
     }
 
+    /// Requires the msg.sender needs to call approve transfer amount on
     /// Requires appTransferFromsEnabled on veFPIS
     function migrateExistingLock() external nonReentrant returns (uint fnftId) {
         IVotingEscrow veFPIS = IVotingEscrow(VOTING_ESCROW);
@@ -168,8 +173,11 @@ contract RevestSpiritSwap is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, R
 
         uint amountToLock = uint(int256(amount));
         // This contract must be approved proxy, both globally and by msg.sender
-        veFPIS.transfer_from_app(msg.sender, smartWallAdd, amount);
+        veFPIS.transfer_to_app(msg.sender, smartWallAdd, amount);
         veFPIS.proxy_slash(msg.sender, amountToLock);
+
+        // We use our admin powers on SmartWalletWhitelistV2 to approve the newly created smart wallet
+        SmartWalletWhitelistV2(IVotingEscrow(VOTING_ESCROW).smart_wallet_checker()).approveWallet(smartWallAdd);
 
          // We deposit our funds into the wallet
         wallet.createLock(amountToLock, endTime);
@@ -184,13 +192,16 @@ contract RevestSpiritSwap is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, R
         uint
     ) external override nonReentrant {
         // Security check to make sure the Revest vault is the only contract that can call this method
-        address vault = IAddressRegistry(addressRegistry).getTokenVault();
-        require(_msgSender() == vault, 'E016');
+        require(_msgSender() == VAULT, 'E016');
 
         address smartWallAdd = Clones.cloneDeterministic(TEMPLATE, keccak256(abi.encode(TOKEN, fnftId)));
         VestedEscrowSmartWallet wallet = VestedEscrowSmartWallet(smartWallAdd);
 
-        wallet.withdraw(VOTING_ESCROW);
+        //claim yield & fee
+        wallet.claimRewards(owner, ADMIN_WALLET, PERFORMANCE_FEE);
+
+        //withdraw fund
+        wallet.withdraw();
         uint balance = IERC20(TOKEN).balanceOf(address(this));
         IERC20(TOKEN).safeTransfer(owner, balance);
 
@@ -216,18 +227,24 @@ contract RevestSpiritSwap is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, R
 
     // Callback from Revest.sol to extend maturity
     function handleTimelockExtensions(uint fnftId, uint expiration, address) external override onlyRevestController {
-        require(expiration - block.timestamp <= MAX_LOCKUP, 'Max lockup is 2 years');
+        require(expiration - block.timestamp <= MAX_LOCKUP, 'Max lockup is 4 years');
         address smartWallAdd = Clones.cloneDeterministic(TEMPLATE, keccak256(abi.encode(TOKEN, fnftId)));
         VestedEscrowSmartWallet wallet = VestedEscrowSmartWallet(smartWallAdd);
-        wallet.increaseUnlockTime(expiration, VOTING_ESCROW);
+        wallet.increaseUnlockTime(expiration);
     }
 
     /// Prerequisite: User has approved this contract to spend tokens on their behalf
     function handleAdditionalDeposit(uint fnftId, uint amountToDeposit, uint, address caller) external override nonReentrant onlyRevestController {
         address smartWallAdd = Clones.cloneDeterministic(TEMPLATE, keccak256(abi.encode(TOKEN, fnftId)));
         VestedEscrowSmartWallet wallet = VestedEscrowSmartWallet(smartWallAdd);
+
+        //Taking management fee
+        uint fxsFee = amountToDeposit * MANAGEMENT_FEE / PERCENTAGE; // Make constant
+        IERC20(TOKEN).safeTransferFrom(caller, ADMIN_WALLET, fxsFee);
+        amountToDeposit -= fxsFee;
+
         IERC20(TOKEN).safeTransferFrom(caller, smartWallAdd, amountToDeposit);
-        wallet.increaseAmount(amountToDeposit, VOTING_ESCROW);
+        wallet.increaseAmount(amountToDeposit);
     }
 
     // Not applicable
@@ -238,51 +255,24 @@ contract RevestSpiritSwap is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, R
         uint fnftId,
         bytes memory
     ) external override onlyTokenHolder(fnftId) {
-        address rewardsAdd = IAddressRegistry(addressRegistry).getRewardsHandler();
         address smartWallAdd = Clones.cloneDeterministic(TEMPLATE, keccak256(abi.encode(TOKEN, fnftId)));
         VestedEscrowSmartWallet wallet = VestedEscrowSmartWallet(smartWallAdd);
-        { 
-            // Want this to be re-run if we change fee distributors or rewards handlers
-            address virtualAdd = address(uint160(uint256(keccak256(abi.encodePacked(DISTRIBUTOR, rewardsAdd)))));
-            if(!_isApproved(smartWallAdd, virtualAdd)) {
-                address[] memory addrArray = new address[](1);
-                addrArray[0] = REWARD_TOKEN;
-                wallet.proxyApproveAll(addrArray, rewardsAdd);
-                _setIsApproved(smartWallAdd, virtualAdd, true);
-            }
-        }
-        wallet.claimRewards(DISTRIBUTOR, msg.sender, rewardsAdd);
+        wallet.claimRewards(msg.sender, ADMIN_WALLET, PERFORMANCE_FEE);
     }       
 
     function proxyExecute(
         uint fnftId,
         address destination,
         bytes memory data
-    ) external onlyTokenHolder(fnftId) returns (bytes memory dataOut) {
+    ) external onlyTokenHolder(fnftId) payable returns (bytes memory dataOut) {
         require(globalProxyEnabled || proxyEnabled[fnftId], 'Proxy access not enabled!');
         address smartWallAdd = Clones.cloneDeterministic(TEMPLATE, keccak256(abi.encode(TOKEN, fnftId)));
         VestedEscrowSmartWallet wallet = VestedEscrowSmartWallet(smartWallAdd);
-        dataOut = wallet.proxyExecute(destination, data);
+        dataOut = wallet.proxyExecute{value: msg.value}(destination, data);
         wallet.cleanMemory();
     }
 
     // Utility functions
-
-    function _isApproved(address wallet, address feeDistro) internal view returns (bool) {
-        uint256 _id = uint256(uint160(feeDistro));
-        uint256 _mask = 1 << _id % 256;
-        return (walletApprovals[wallet][_id / 256] & _mask) != 0;
-    }
-
-    function _setIsApproved(address wallet, address feeDistro, bool _approval) internal {
-        uint256 _id = uint256(uint160(feeDistro));
-        if (_approval) {
-            walletApprovals[wallet][_id / 256] |= 1 << _id % 256;
-        } else {
-            walletApprovals[wallet][_id / 256] &= 0 << _id % 256;
-        }
-    }
-
     function _mintFNFT(uint endTime) internal returns (uint fnftId) {
         /// Mint FNFT
         
@@ -321,12 +311,16 @@ contract RevestSpiritSwap is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, R
         DISTRIBUTOR = _distro;
     }
 
-    function setSpiritAdmin(address _admin) external onlyOwner {
-        ADMIN = _admin;
+    function setRevestAdmin(address _admin) external onlyOwner {
+        ADMIN_WALLET = _admin;
     }
 
-    function setWeiFee(uint _fee) external onlyOwner {
-        weiFee = _fee;
+    function setPerformanceFee(uint fee) external onlyOwner {
+        PERFORMANCE_FEE = fee;
+    }
+
+    function setManagementFee(uint fee) external onlyOwner {
+        MANAGEMENT_FEE = fee;
     }
 
     function setMetadata(string memory _meta) external onlyOwner {
@@ -353,7 +347,6 @@ contract RevestSpiritSwap is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, R
         IERC20(token).safeTransfer(msg.sender, amount);
     }
 
-
     /// View Functions
 
     function getCustomMetadata(uint) external view override returns (string memory) {
@@ -371,17 +364,22 @@ contract RevestSpiritSwap is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, R
     }
 
     function getOutputDisplayValues(uint fnftId) external view override returns (bytes memory displayData) {
-        (uint reward, bool hasRewards) = getRewardsForFNFT(fnftId);
+         //calculate yield output for certain FNFT 
+        uint yield = IYieldDistributor(DISTRIBUTOR).earned(Clones.predictDeterministicAddress(TEMPLATE, keccak256(abi.encode(TOKEN, fnftId))));
+        bool hasRewards =  (yield > 0) ? true : false;
+
+        //Making string to output
         string memory rewardsDesc;
         if(hasRewards) {
             string memory par1 = string(abi.encodePacked(RevestHelper.getName(REWARD_TOKEN),": "));
-            string memory par2 = string(abi.encodePacked(RevestHelper.amountToDecimal(reward, REWARD_TOKEN), " [", RevestHelper.getTicker(REWARD_TOKEN), "] Tokens Available"));
+            string memory par2 = string(abi.encodePacked(RevestHelper.amountToDecimal(yield, REWARD_TOKEN), " [", RevestHelper.getTicker(REWARD_TOKEN), "] Tokens Available"));
             rewardsDesc = string(abi.encodePacked(par1, par2));
         }
+
         address smartWallet = getAddressForFNFT(fnftId);
         uint maxExtension = block.timestamp / (1 weeks) * (1 weeks) + MAX_LOCKUP; //Ensures no confusion with time zones and date-selectors
-        (int128 spiritBalance, ) = IVotingEscrow(VOTING_ESCROW).locked(smartWallet);
-        displayData = abi.encode(smartWallet, rewardsDesc, hasRewards, maxExtension, TOKEN, spiritBalance);
+        (int128 lockedBalance, ) = IVotingEscrow(VOTING_ESCROW).locked(smartWallet);
+        displayData = abi.encode(smartWallet, rewardsDesc, hasRewards, maxExtension, TOKEN, lockedBalance);
     }
 
     function getAddressRegistry() external view override returns (address) {
@@ -393,118 +391,14 @@ contract RevestSpiritSwap is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, R
     }
 
     function getFlatWeiFee(address) external view override returns (uint) {
-        return weiFee;
+        return PERFORMANCE_FEE;
     }
 
-    function getERC20Fee(address) external pure override returns (uint) {
-        return 0;
+    function getERC20Fee(address) external view override returns (uint) {
+        return MANAGEMENT_FEE;
     }
 
     function getAddressForFNFT(uint fnftId) public view returns (address smartWallAdd) {
         smartWallAdd = Clones.predictDeterministicAddress(TEMPLATE, keccak256(abi.encode(TOKEN, fnftId)));
     }
-
-    // Find rewards for a given smart wallet using the Curve formulae
-    function getRewardsForFNFT(uint fnftId) private view returns (uint reward, bool rewardsPresent) {
-        uint userEpoch;
-        IDistributor distro = IDistributor(DISTRIBUTOR);
-        IVotingEscrow voting = IVotingEscrow(VOTING_ESCROW);
-        address smartWallAdd = getAddressForFNFT(fnftId);
-        
-        uint lastTokenTime = distro.last_token_time();
-        lastTokenTime = lastTokenTime / WEEK * WEEK;
-
-        uint maxUserEpoch = voting.user_point_epoch(smartWallAdd);
-        uint startTime = distro.start_time();
-        
-        if(maxUserEpoch == 0) {
-            return (reward, rewardsPresent);
-        }
-
-        uint weekCursor = distro.time_cursor_of(smartWallAdd);
-        if(weekCursor == 0) {
-            userEpoch = findTimestampUserEpoch(smartWallAdd, startTime, maxUserEpoch);
-        } else {
-            userEpoch = distro.user_epoch_of(smartWallAdd);
-        }
-
-        if(userEpoch == 0) {
-            userEpoch = 1;
-        }
-
-        IVotingEscrow.Point memory userPoint = voting.user_point_history(smartWallAdd, userEpoch);
-
-        if(weekCursor == 0) {
-            weekCursor = (userPoint.ts + WEEK - 1) / WEEK * WEEK;
-        }
-
-        if(weekCursor >= lastTokenTime) {
-            return (reward, rewardsPresent);
-        }
-
-        if(weekCursor < startTime) {
-            weekCursor = startTime;
-        }
-
-        IVotingEscrow.Point memory oldUserPoint;
-
-        for(uint i = 0; i < 150; i++) {
-            if(weekCursor >= lastTokenTime) {
-                break;
-            }
-
-            if(weekCursor >= userPoint.ts && userEpoch <= maxUserEpoch) {
-                userEpoch++;
-                oldUserPoint = userPoint;
-                if(userEpoch > maxUserEpoch) {
-                    IVotingEscrow.Point memory tmpPoint;
-                    userPoint = tmpPoint;
-                } else {
-                    userPoint = voting.user_point_history(smartWallAdd, userEpoch);
-                }
-            } else {
-                uint balanceOf;
-                {
-                    int128 dt = int128(uint128(weekCursor - oldUserPoint.ts));
-                    int128 res = oldUserPoint.bias - dt * oldUserPoint.slope;
-                    balanceOf = res > 0 ? uint(int256(res)) : 0;
-                }
-                if(balanceOf == 0 && userEpoch > maxUserEpoch) {
-                    break;
-                } 
-                if(balanceOf > 0) {
-                    
-                    reward += balanceOf * distro.tokens_per_week(weekCursor) / distro.ve_supply(weekCursor);
-                    if(reward > 0 && !rewardsPresent) {
-                        rewardsPresent = true;
-                    } 
-                    
-                }
-                weekCursor += WEEK;
-            }
-        }
-
-        return (reward, rewardsPresent);
-    }
-
-    // Implementation of Binary Search
-    function findTimestampUserEpoch(address user, uint timestamp, uint maxUserEpoch) private view returns (uint timestampEpoch) {
-        uint min;
-        uint max = maxUserEpoch;
-        for(uint i = 0; i < 128; i++) {
-            if(min >= max) {
-                break;
-            }
-            uint mid = (min + max + 2) / 2;
-            uint ts = IVotingEscrow(VOTING_ESCROW).user_point_history(user, mid).ts;
-            if(ts <= timestamp) {
-                min = mid;
-            } else {
-                max = mid - 1;
-            }
-        }
-        return min;
-    }
-
-    
 }

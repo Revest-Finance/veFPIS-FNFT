@@ -1,2 +1,6 @@
 .trash
 yarn.lock
+
+node_modules/
+out/
+lib/

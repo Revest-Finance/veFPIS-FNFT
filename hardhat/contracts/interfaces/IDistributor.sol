@@ -10,8 +10,6 @@ import '@openzeppelin/contracts/utils/introspection/IERC165.sol';
  */
 interface IDistributor {
 
-    function getYield() external returns (uint amountTransferred);
-
     function user_epoch_of(address _addr) external view returns (uint epoch);
 
     function tokens_per_week(uint index) external view returns (uint tokensPerDay);

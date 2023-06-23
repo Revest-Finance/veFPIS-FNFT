@@ -1,0 +1,12 @@
+[submodule "lib/forge-std"]
+	path = lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
+[submodule "hardhat/lib/forge-std"]
+	path = hardhat/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
+[submodule "hardhat/lib/solmate"]
+	path = hardhat/lib/solmate
+	url = https://github.com/transmissions11/solmate
+[submodule "hardhat/lib/openzeppelin-contracts"]
+	path = hardhat/lib/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts
