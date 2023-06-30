@@ -1,8 +1,3 @@
-# Setup
+Revest VeFPIS for Frax Build 2023
 
-1. cd into hardhat
-2. Run npm install
-3. Create a .env file under /hardhat according to .envtemplate
-4. Use "npx hardhat run scripts/deploy-uniswap-test.js --network YOURNETWORKHERE" to deploy the contract
-5. Use 'npx hardhat run scripts/verify-uniswap-test.js --network YOURNETWORKHERE" to verify the contract after pasting its address in
-
+This BUIDL builds on the vesting/yield system of veFXS from the Frax Ecosystem, using Revest core technology. The product allows users to deposit FPIS into the veFPIS vault and receive an FNFT (Financial FNFT) as a record of their deposit (amount, timelock, and even yield calculated in real-time). Users can deposit additional amounts, extend their locking time, and claim yield natively from their FNFTs. As the veFPIS balance is attached to the FNFT's smart wallet address, users are able to sell or lend their veFPIS positions to others.
