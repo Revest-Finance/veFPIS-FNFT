@@ -2222,8 +2222,8 @@
       }
     },
     "test/foundry/veFPIS.t.sol": {
-      "lastModificationDate": 1694634259774,
-      "contentHash": "5b04f6cfaba843a646dcb0edf9f28aee",
+      "lastModificationDate": 1694703739561,
+      "contentHash": "605f2a60f51c74453dde9bfb4060c4d8",
       "sourceName": "test/foundry/veFPIS.t.sol",
       "solcConfig": {
         "settings": {

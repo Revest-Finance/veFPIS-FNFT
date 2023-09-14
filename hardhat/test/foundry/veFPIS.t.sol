@@ -56,7 +56,6 @@ contract veFPISRevest is Test {
         revestVe  = new RevestVeFPIS(PROVIDER, VOTING_ESCROW, DISTRIBUTOR, admin);
         smartWalletChecker = new SmartWalletWhitelistV2(admin);
         
-        hoax(admin, admin);
         smartWalletChecker.changeAdmin(address(revestVe), true);
 
         vm.label(address(admin), "admin");
