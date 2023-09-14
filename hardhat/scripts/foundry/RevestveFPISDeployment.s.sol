@@ -24,7 +24,8 @@ contract RevestVeFPISDeployment is Script {
     address veFPIS = 0x574C154C83432B0A45BA3ad2429C3fA242eD7359;
     address distritbutor = 0xE6D31C144BA99Af564bE7E81261f7bD951b802F6;
 
-    address adminWallet = 0x0eCBb61d0698AEFeaDC26BdC2d328Bc170D2CDf2; // my address deployer
+    address adminWallet = 0x0eCBb61d0698AEFeaDC26BdC2d328Bc170D2CDf2; // Ekkila Deployment Address
+    address FraxMultiSig = 0x6A7efa964Cf6D9Ab3BC3c47eBdDB853A8853C502;
 
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
@@ -33,13 +34,11 @@ contract RevestVeFPISDeployment is Script {
         vm.startBroadcast(deployer);
 
         address revestVeFPIS = factory.deploy(keccak256(abi.encode("RevestVeFPIS")), abi.encodePacked(type(RevestVeFPIS).creationCode, abi.encode(revestRegistry, veFPIS, distritbutor, adminWallet)));
-        address smartWalletChecker = factory.deploy(keccak256(abi.encode("RevestVeFPIS")), abi.encodePacked(type(RevestVeFPIS).creationCode, abi.encode(adminWallet)));
-
-        SmartWalletWhitelistV2(smartWalletChecker).changeAdmin(revestVeFPIS, true);
+        address smartWalletChecker = factory.deploy(keccak256(abi.encode("RevestVeFPIS")), abi.encodePacked(type(RevestVeFPIS).creationCode, abi.encode(revestVeFPIS)));
         
+        SmartWalletWhitelistV2(smartWalletChecker).transferSuperAdmin(FraxMultiSig);
+
         vm.stopBroadcast();
         console.log("---DEPLOYMENT SUCCESSFUL---");
-
-
     }
 }
