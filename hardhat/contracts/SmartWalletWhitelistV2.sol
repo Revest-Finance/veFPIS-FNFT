@@ -2,20 +2,21 @@
 
 pragma solidity ^0.8.0;
 
+import "@openzeppelin/contracts/access/AccessControl.sol";
+
 interface SmartWalletChecker {
     function check(address) external view returns (bool);
 }
 
-/// @author RobAnon
-contract SmartWalletWhitelistV2 {
+/**
+ * 
+ * @author RobAnon, Ekkila
+ */
+contract SmartWalletWhitelistV2 is AccessControl  {
     
     mapping(address => bool) public wallets;
-    
-    bytes32 public constant ADMIN = "ADMIN";
 
-    bytes32 public constant SUPER_ADMIN = "SUPER_ADMIN";
-
-    mapping(address => bytes32) public roles;
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN");
     
     address public checker;
     address public future_checker;
@@ -23,46 +24,30 @@ contract SmartWalletWhitelistV2 {
     event ApproveWallet(address);
     event RevokeWallet(address);
     
-    constructor(address _admin) {
-        roles[_admin] = ADMIN;
-        roles[msg.sender] = SUPER_ADMIN;
+    constructor(address _superAdmin, address _admin) {
+        _setupRole(DEFAULT_ADMIN_ROLE, _superAdmin);
+        _setupRole(ADMIN_ROLE, _admin);
     }
     
     function commitSetChecker(address _checker) external {
-        require(isSuperAdmin(msg.sender), "Error: Not Super admin");
+        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Error: Caller is not a super admin!");
         future_checker = _checker;
-    }
-
-    function changeAdmin(address _admin, bool validAdmin) external {
-        require(isSuperAdmin(msg.sender), "Error: Not Super admin");
-        require(!isSuperAdmin(_admin), "Error: Entered address is already Super admin"); // Overwrite protection
-        if(validAdmin) {
-            roles[_admin] = ADMIN;
-        } else {
-            roles[_admin] = 0x0;
-        }
-    }
-
-    function transferSuperAdmin(address _newAdmin) external {
-        require(isSuperAdmin(msg.sender),"Error: Not Super admin");
-        roles[msg.sender] = 0x0;
-        roles[_newAdmin] = SUPER_ADMIN;
     }
     
     function applySetChecker() external {
-        require(isSuperAdmin(msg.sender), "Error: Not Super admin");
+        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Error: Caller is not a super admin!");
         checker = future_checker;
     }
     
     function approveWallet(address _wallet) public {
-        require(isAdmin(msg.sender), "Error: Not admin");
+        require(hasRole(ADMIN_ROLE, msg.sender) || hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Error: Caller is not an admin!");
         wallets[_wallet] = true;
         
         emit ApproveWallet(_wallet);
     }
 
     function batchApproveWallets(address[] memory _wallets) public {
-        require(isAdmin(msg.sender), "Error: Not admin");
+        require(hasRole(ADMIN_ROLE, msg.sender) || hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Error: Caller is not an admin!");
         for(uint i = 0; i < _wallets.length; i++) {
             wallets[_wallets[i]] = true;
             emit ApproveWallet(_wallets[i]);
@@ -70,7 +55,7 @@ contract SmartWalletWhitelistV2 {
     }
 
     function revokeWallet(address _wallet) external {
-        require(isAdmin(msg.sender), "Error: Not admin");
+        require(hasRole(ADMIN_ROLE, msg.sender) || hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Error: Caller is not an admin!");
         wallets[_wallet] = false;
         
         emit RevokeWallet(_wallet);
@@ -87,14 +72,4 @@ contract SmartWalletWhitelistV2 {
         }
         return false;
     }
-
-    function isAdmin(address checkAdd) internal view returns (bool valid) {
-        valid = roles[checkAdd] == ADMIN || roles[checkAdd] == SUPER_ADMIN;
-    }
-
-    function isSuperAdmin(address checkAdd) internal view returns (bool valid) {
-        valid = roles[checkAdd] == SUPER_ADMIN;
-    }
-
-    
 }

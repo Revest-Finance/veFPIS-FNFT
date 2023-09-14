@@ -38,6 +38,8 @@ contract veFPISRevest is Test {
     address admin = makeAddr("admin");
     address fpisWhale = 0x89623FBA59e54c9863346b4d27F0f86369Da11E5;
 
+    address fpisMultisig = 0x6A7efa964Cf6D9Ab3BC3c47eBdDB853A8853C502;
+
     uint MANAGEMENT_FEE = 5;
     uint PERFORMANCE_FEE = 100;
 
@@ -54,9 +56,7 @@ contract veFPISRevest is Test {
         vm.selectFork(fork1);
 
         revestVe  = new RevestVeFPIS(PROVIDER, VOTING_ESCROW, DISTRIBUTOR, admin);
-        smartWalletChecker = new SmartWalletWhitelistV2(admin);
-        
-        smartWalletChecker.changeAdmin(address(revestVe), true);
+        smartWalletChecker = new SmartWalletWhitelistV2(fpisMultisig, address(revestVe));
 
         vm.label(address(admin), "admin");
         vm.label(address(fpisWhale), "fpisWhale");
