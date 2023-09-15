@@ -12,7 +12,7 @@ interface SmartWalletChecker {
  * 
  * @author RobAnon, Ekkila
  */
-contract SmartWalletWhitelistV2 is AccessControl  {
+contract SmartWalletWhitelistV3 is AccessControl  {
     
     mapping(address => bool) public wallets;
 
@@ -29,13 +29,11 @@ contract SmartWalletWhitelistV2 is AccessControl  {
         _setupRole(ADMIN_ROLE, _admin);
     }
     
-    function commitSetChecker(address _checker) external {
-        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Error: Caller is not a super admin!");
+    function commitSetChecker(address _checker) external onlyRole(DEFAULT_ADMIN_ROLE) {
         future_checker = _checker;
     }
     
-    function applySetChecker() external {
-        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Error: Caller is not a super admin!");
+    function applySetChecker() external onlyRole(DEFAULT_ADMIN_ROLE) {
         checker = future_checker;
     }
     
