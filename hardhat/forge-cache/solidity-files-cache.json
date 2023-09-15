@@ -91,8 +91,8 @@
       }
     },
     "contracts/SmartWalletWhitelistV2.sol": {
-      "lastModificationDate": 1694719779650,
-      "contentHash": "7554c62486964c722ca884be94ef4c59",
+      "lastModificationDate": 1694799545220,
+      "contentHash": "f0a3b38aa75904b3d3093862232f04fb",
       "sourceName": "contracts/SmartWalletWhitelistV2.sol",
       "solcConfig": {
         "settings": {
