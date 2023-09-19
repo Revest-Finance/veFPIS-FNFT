@@ -4,7 +4,7 @@ pragma solidity ^0.8.13;
 import "forge-std/Test.sol";
 import "contracts/RevestVeFPIS.sol";
 import "contracts/VestedEscrowSmartWallet.sol";
-import "contracts/SmartWalletWhitelistV2.sol";
+import "contracts/SmartWalletWhitelistV3.sol";
 import "contracts/interfaces/IVotingEscrow.sol";
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -32,7 +32,7 @@ contract veFPISRevest is Test {
     ERC20 FPIS = ERC20(0xc2544A32872A91F4A553b404C6950e89De901fdb);
 
     RevestVeFPIS revestVe;
-    SmartWalletWhitelistV2 smartWalletChecker;
+    SmartWalletWhitelistV3 smartWalletChecker;
     IVotingEscrow veFPIS =  IVotingEscrow(VOTING_ESCROW);
 
     address admin = makeAddr("admin");
@@ -56,7 +56,7 @@ contract veFPISRevest is Test {
         vm.selectFork(fork1);
 
         revestVe  = new RevestVeFPIS(PROVIDER, VOTING_ESCROW, DISTRIBUTOR, admin);
-        smartWalletChecker = new SmartWalletWhitelistV2(fpisMultisig, address(revestVe));
+        smartWalletChecker = new SmartWalletWhitelistV3(fpisMultisig, address(revestVe));
 
         vm.label(address(admin), "admin");
         vm.label(address(fpisWhale), "fpisWhale");

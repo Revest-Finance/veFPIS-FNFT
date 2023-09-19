@@ -13,7 +13,7 @@ import "./interfaces/IVotingEscrow.sol";
 import "./interfaces/IFeeReporter.sol";
 import "./interfaces/IDistributor.sol";
 import "./VestedEscrowSmartWallet.sol";
-import "./SmartWalletWhitelistV2.sol";
+import "./SmartWalletWhitelistV3.sol";
 
 // OZ imports
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -151,7 +151,7 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
         IERC20(TOKEN).safeTransferFrom(msg.sender, smartWallAdd, amountToLock);
 
         // We use our admin powers on SmartWalletWhitelistV2 to approve the newly created smart wallet
-        SmartWalletWhitelistV2(IVotingEscrow(VOTING_ESCROW).smart_wallet_checker()).approveWallet(smartWallAdd);
+        SmartWalletWhitelistV3(IVotingEscrow(VOTING_ESCROW).smart_wallet_checker()).approveWallet(smartWallAdd);
 
         // We deposit our funds into the wallet
         wallet.createLock(amountToLock, endTime);
@@ -177,7 +177,7 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
         veFPIS.proxy_slash(msg.sender, amountToLock);
 
         // We use our admin powers on SmartWalletWhitelistV2 to approve the newly created smart wallet
-        SmartWalletWhitelistV2(IVotingEscrow(VOTING_ESCROW).smart_wallet_checker()).approveWallet(smartWallAdd);
+        SmartWalletWhitelistV3(IVotingEscrow(VOTING_ESCROW).smart_wallet_checker()).approveWallet(smartWallAdd);
 
          // We deposit our funds into the wallet
         wallet.createLock(amountToLock, endTime);
@@ -206,7 +206,7 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
         IERC20(TOKEN).safeTransfer(owner, balance);
 
         // Clean up memory
-        SmartWalletWhitelistV2(IVotingEscrow(VOTING_ESCROW).smart_wallet_checker()).revokeWallet(smartWallAdd);
+        SmartWalletWhitelistV3(IVotingEscrow(VOTING_ESCROW).smart_wallet_checker()).revokeWallet(smartWallAdd);
 
         emit WithdrawERC20OutputReceiver(owner, TOKEN, balance, fnftId, abi.encode(smartWallAdd));
     }

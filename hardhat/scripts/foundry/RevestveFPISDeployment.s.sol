@@ -3,7 +3,7 @@ pragma solidity <=0.8.19;
 import {Script} from "forge-std/Script.sol";
 
 import {RevestVeFPIS} from "contracts/RevestVeFPIS.sol";
-import {SmartWalletWhitelistV2} from "contracts/SmartWalletWhitelistV2.sol";
+import {SmartWalletWhitelistV3} from "contracts/SmartWalletWhitelistV3.sol";
 
 import {console2 as console} from "forge-std/console2.sol";
 
@@ -34,7 +34,7 @@ contract RevestVeFPISDeployment is Script {
         vm.startBroadcast(deployer);
 
         address revestVeFPIS = factory.deploy(keccak256(abi.encode("RevestVeFPIS")), abi.encodePacked(type(RevestVeFPIS).creationCode, abi.encode(revestRegistry, veFPIS, distritbutor, adminWallet)));
-        SmartWalletWhitelistV2 smartWalletChecker = new SmartWalletWhitelistV2(FraxMultiSig, revestVeFPIS);
+        SmartWalletWhitelistV3 smartWalletChecker = new SmartWalletWhitelistV3(FraxMultiSig, revestVeFPIS);
 
         vm.stopBroadcast();
         console.log("---DEPLOYMENT SUCCESSFUL---");

@@ -13,8 +13,8 @@
   },
   "files": {
     "contracts/RevestVeFPIS.sol": {
-      "lastModificationDate": 1694634259767,
-      "contentHash": "968b478a33c65925e46ee0e1a587df4b",
+      "lastModificationDate": 1695108762618,
+      "contentHash": "1d0b8f5d82685c7284783f7f18507648",
       "sourceName": "contracts/RevestVeFPIS.sol",
       "solcConfig": {
         "settings": {
@@ -46,7 +46,7 @@
         }
       },
       "imports": [
-        "contracts/SmartWalletWhitelistV2.sol",
+        "contracts/SmartWalletWhitelistV3.sol",
         "contracts/VestedEscrowSmartWallet.sol",
         "contracts/interfaces/IAddressRegistry.sol",
         "contracts/interfaces/IDistributor.sol",
@@ -90,10 +90,10 @@
         }
       }
     },
-    "contracts/SmartWalletWhitelistV2.sol": {
-      "lastModificationDate": 1694799545220,
-      "contentHash": "f0a3b38aa75904b3d3093862232f04fb",
-      "sourceName": "contracts/SmartWalletWhitelistV2.sol",
+    "contracts/SmartWalletWhitelistV3.sol": {
+      "lastModificationDate": 1694799593883,
+      "contentHash": "49d764f0f9839402ab1148c1f405be13",
+      "sourceName": "contracts/SmartWalletWhitelistV3.sol",
       "solcConfig": {
         "settings": {
           "optimizer": {
@@ -136,10 +136,10 @@
       "versionRequirement": "^0.8.0",
       "artifacts": {
         "SmartWalletChecker": {
-          "0.8.19+commit.7dd6d404.Darwin.appleclang": "SmartWalletWhitelistV2.sol/SmartWalletChecker.json"
+          "0.8.19+commit.7dd6d404.Darwin.appleclang": "SmartWalletWhitelistV3.sol/SmartWalletChecker.json"
         },
-        "SmartWalletWhitelistV2": {
-          "0.8.19+commit.7dd6d404.Darwin.appleclang": "SmartWalletWhitelistV2.sol/SmartWalletWhitelistV2.json"
+        "SmartWalletWhitelistV3": {
+          "0.8.19+commit.7dd6d404.Darwin.appleclang": "SmartWalletWhitelistV3.sol/SmartWalletWhitelistV3.json"
         }
       }
     },
@@ -2366,8 +2366,8 @@
       }
     },
     "scripts/foundry/RevestVeFPISDeployment.s.sol": {
-      "lastModificationDate": 1694719822429,
-      "contentHash": "c236b20ef335ef32349fe619e3c58151",
+      "lastModificationDate": 1695108739412,
+      "contentHash": "82a1ea051f70922d7715a2e9a1342d32",
       "sourceName": "scripts/foundry/RevestVeFPISDeployment.s.sol",
       "solcConfig": {
         "settings": {
@@ -2400,7 +2400,7 @@
       },
       "imports": [
         "contracts/RevestVeFPIS.sol",
-        "contracts/SmartWalletWhitelistV2.sol",
+        "contracts/SmartWalletWhitelistV3.sol",
         "contracts/VestedEscrowSmartWallet.sol",
         "contracts/interfaces/IAddressRegistry.sol",
         "contracts/interfaces/IDistributor.sol",
@@ -2456,9 +2456,77 @@
         }
       }
     },
+    "test/foundry/SmartWalletWaitlistV3.t.sol": {
+      "lastModificationDate": 1695109070370,
+      "contentHash": "b52c74d42e4d4b93c9afc2a7fcb38225",
+      "sourceName": "test/foundry/SmartWalletWaitlistV3.t.sol",
+      "solcConfig": {
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "metadata": {
+            "useLiteralContent": false,
+            "bytecodeHash": "ipfs",
+            "appendCBOR": true
+          },
+          "outputSelection": {
+            "*": {
+              "": [
+                "ast"
+              ],
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ]
+            }
+          },
+          "evmVersion": "paris",
+          "libraries": {}
+        }
+      },
+      "imports": [
+        "contracts/SmartWalletWhitelistV3.sol",
+        "lib/forge-std/lib/ds-test/src/test.sol",
+        "lib/forge-std/src/Base.sol",
+        "lib/forge-std/src/StdAssertions.sol",
+        "lib/forge-std/src/StdChains.sol",
+        "lib/forge-std/src/StdCheats.sol",
+        "lib/forge-std/src/StdError.sol",
+        "lib/forge-std/src/StdInvariant.sol",
+        "lib/forge-std/src/StdJson.sol",
+        "lib/forge-std/src/StdMath.sol",
+        "lib/forge-std/src/StdStorage.sol",
+        "lib/forge-std/src/StdStyle.sol",
+        "lib/forge-std/src/StdUtils.sol",
+        "lib/forge-std/src/Test.sol",
+        "lib/forge-std/src/Vm.sol",
+        "lib/forge-std/src/console.sol",
+        "lib/forge-std/src/console2.sol",
+        "lib/forge-std/src/interfaces/IMulticall3.sol",
+        "lib/openzeppelin-contracts/contracts/access/AccessControl.sol",
+        "lib/openzeppelin-contracts/contracts/access/IAccessControl.sol",
+        "lib/openzeppelin-contracts/contracts/utils/Context.sol",
+        "lib/openzeppelin-contracts/contracts/utils/Strings.sol",
+        "lib/openzeppelin-contracts/contracts/utils/introspection/ERC165.sol",
+        "lib/openzeppelin-contracts/contracts/utils/introspection/IERC165.sol",
+        "lib/openzeppelin-contracts/contracts/utils/math/Math.sol",
+        "lib/openzeppelin-contracts/contracts/utils/math/SignedMath.sol"
+      ],
+      "versionRequirement": "^0.8.13",
+      "artifacts": {
+        "SmartWalletWaitlistV3": {
+          "0.8.19+commit.7dd6d404.Darwin.appleclang": "SmartWalletWaitlistV3.t.sol/SmartWalletWaitlistV3.json"
+        }
+      }
+    },
     "test/foundry/veFPIS.t.sol": {
-      "lastModificationDate": 1694719759975,
-      "contentHash": "45edea3149c1909f06d52e43327f38d5",
+      "lastModificationDate": 1695108893221,
+      "contentHash": "4ef19278cde388a6bab02254a4003eeb",
       "sourceName": "test/foundry/veFPIS.t.sol",
       "solcConfig": {
         "settings": {
@@ -2491,7 +2559,7 @@
       },
       "imports": [
         "contracts/RevestVeFPIS.sol",
-        "contracts/SmartWalletWhitelistV2.sol",
+        "contracts/SmartWalletWhitelistV3.sol",
         "contracts/VestedEscrowSmartWallet.sol",
         "contracts/interfaces/IAddressRegistry.sol",
         "contracts/interfaces/IDistributor.sol",
