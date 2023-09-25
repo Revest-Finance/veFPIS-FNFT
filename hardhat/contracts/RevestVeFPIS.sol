@@ -96,7 +96,7 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
     mapping (uint => bool) public proxyEnabled;
 
     // Initialize the contract with the needed valeus
-    constructor(address _provider, address _vE, address _distro, address _revestAdmin, address _smartWalletChecker) {
+    constructor(address _provider, address _vE, address _distro, address _revestAdmin) {
         addressRegistry = _provider;
         VOTING_ESCROW = _vE;
         DISTRIBUTOR = _distro;
@@ -105,7 +105,6 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
         TEMPLATE = address(wallet);
         ADMIN_WALLET = _revestAdmin;
         VAULT =  IAddressRegistry(_provider).getTokenVault();
-        SMART_WALLET_CHECKER = _smartWalletChecker;
     }
 
     modifier onlyRevestController() {
@@ -121,7 +120,7 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
 
     modifier onlyWhitelistedContract() {
         if (msg.sender != tx.origin) {
-            address checker = SMART_WALLET_CHECKER;
+            address checker = IVotingEscrow(VOTING_ESCROW).smart_wallet_checker();
             if (checker != address(0)) {
                 require(SmartWalletWhitelistV3(checker).check(msg.sender), "Error: Not whitelisted contract");
             }

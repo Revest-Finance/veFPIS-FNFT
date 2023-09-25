@@ -58,8 +58,14 @@ contract veFPISRevest is Test {
         vm.selectFork(fork1);
 
         smartWalletChecker = new SmartWalletWhitelistV3(fpisMultisig);
-        revestVe  = new RevestVeFPIS(PROVIDER, VOTING_ESCROW, DISTRIBUTOR, admin, address(smartWalletChecker));
+        revestVe  = new RevestVeFPIS(PROVIDER, VOTING_ESCROW, DISTRIBUTOR, admin);
         
+        hoax(veFPISAdmin, veFPISAdmin);
+        veFPIS.commit_smart_wallet_checker(address(smartWalletChecker));
+
+        hoax(veFPISAdmin, veFPISAdmin);
+        veFPIS.apply_smart_wallet_checker();
+
         hoax(fpisMultisig, fpisMultisig);
         smartWalletChecker.grantRole(ADMIN_ROLE, address(revestVe));
 
@@ -71,12 +77,6 @@ contract veFPISRevest is Test {
 
         hoax(revestOwner, revestOwner);
         revest.modifyWhitelist(address(revestVe), true);
-
-        hoax(veFPISAdmin, veFPISAdmin);
-        veFPIS.commit_smart_wallet_checker(address(smartWalletChecker));
-
-        hoax(veFPISAdmin, veFPISAdmin);
-        veFPIS.apply_smart_wallet_checker();
     }
 
     /**
