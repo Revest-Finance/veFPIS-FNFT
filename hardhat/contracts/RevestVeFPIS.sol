@@ -62,6 +62,9 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
     // veFPIS token    
     address public constant REWARD_TOKEN = 0xc2544A32872A91F4A553b404C6950e89De901fdb;
 
+    // Smart Wallet Checker
+    address public SMART_WALLET_CHECKER;
+
     // Template address for VE wallets
     address public immutable TEMPLATE;
 
@@ -93,7 +96,7 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
     mapping (uint => bool) public proxyEnabled;
 
     // Initialize the contract with the needed valeus
-    constructor(address _provider, address _vE, address _distro, address _revestAdmin) {
+    constructor(address _provider, address _vE, address _distro, address _revestAdmin, address _smartWalletChecker) {
         addressRegistry = _provider;
         VOTING_ESCROW = _vE;
         DISTRIBUTOR = _distro;
@@ -102,6 +105,7 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
         TEMPLATE = address(wallet);
         ADMIN_WALLET = _revestAdmin;
         VAULT =  IAddressRegistry(_provider).getTokenVault();
+        SMART_WALLET_CHECKER = _smartWalletChecker;
     }
 
     modifier onlyRevestController() {
@@ -112,6 +116,16 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
     modifier onlyTokenHolder(uint fnftId) {
         IAddressRegistry reg = IAddressRegistry(addressRegistry);
         require(IFNFTHandler(reg.getRevestFNFT()).getBalance(msg.sender, fnftId) > 0, 'E064');
+        _;
+    }
+
+    modifier onlyWhitelistedContract() {
+        if (msg.sender != tx.origin) {
+            address checker = SMART_WALLET_CHECKER;
+            if (checker != address(0)) {
+                require(SmartWalletWhitelistV3(checker).check(msg.sender), "Error: Not whitelisted contract");
+            }
+        }
         _;
     }
 
@@ -132,7 +146,7 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
     function createNewLock(
         uint endTime,
         uint amountToLock
-    ) external nonReentrant returns (uint fnftId) {
+    ) external nonReentrant onlyWhitelistedContract returns (uint fnftId) {
         //Taking Management Fee
         uint fxsFee = amountToLock * MANAGEMENT_FEE / PERCENTAGE; // Make constant
         IERC20(TOKEN).safeTransferFrom(msg.sender, ADMIN_WALLET, fxsFee);
@@ -160,7 +174,7 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
 
     /// Requires the msg.sender needs to call approve transfer amount on
     /// Requires appTransferFromsEnabled on veFPIS
-    function migrateExistingLock() external nonReentrant returns (uint fnftId) {
+    function migrateExistingLock() external nonReentrant onlyWhitelistedContract returns (uint fnftId) {
         IVotingEscrow veFPIS = IVotingEscrow(VOTING_ESCROW);
         (int128 amount, uint endTime) = veFPIS.locked(msg.sender);
 
@@ -401,4 +415,6 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
     function getAddressForFNFT(uint fnftId) public view returns (address smartWallAdd) {
         smartWallAdd = Clones.predictDeterministicAddress(TEMPLATE, keccak256(abi.encode(TOKEN, fnftId)));
     }
+
+
 }

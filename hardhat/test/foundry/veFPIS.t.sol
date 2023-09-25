@@ -50,13 +50,18 @@ contract veFPISRevest is Test {
 
     address smartWalletAddress;
 
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN");
+
 
     function setUp() public {
         uint fork1 = vm.createFork("https://mainnet.infura.io/v3/08cfb263de5249ba9bb25868d93d0d45", 17389890);
         vm.selectFork(fork1);
 
-        revestVe  = new RevestVeFPIS(PROVIDER, VOTING_ESCROW, DISTRIBUTOR, admin);
-        smartWalletChecker = new SmartWalletWhitelistV3(fpisMultisig, address(revestVe));
+        smartWalletChecker = new SmartWalletWhitelistV3(fpisMultisig);
+        revestVe  = new RevestVeFPIS(PROVIDER, VOTING_ESCROW, DISTRIBUTOR, admin, address(smartWalletChecker));
+        
+        hoax(fpisMultisig, fpisMultisig);
+        smartWalletChecker.grantRole(ADMIN_ROLE, address(revestVe));
 
         vm.label(address(admin), "admin");
         vm.label(address(fpisWhale), "fpisWhale");
@@ -86,9 +91,9 @@ contract veFPISRevest is Test {
         uint expiration = block.timestamp + (2 * 365 * 60 * 60 * 24); // 2 years 
 
         //Mint the FNFT
-        hoax(fpisWhale);
+        hoax(fpisWhale, fpisWhale);
         FPIS.approve(address(revestVe), amount);
-        hoax(fpisWhale);
+        hoax(fpisWhale, fpisWhale);
         fnftId = revestVe.createNewLock(expiration, amount);
 
         uint expectedValue = revestVe.getValue(fnftId);
@@ -119,9 +124,9 @@ contract veFPISRevest is Test {
         uint oriBal = FPIS.balanceOf(address(admin));
 
         //Minting the FNFT
-        hoax(fpisWhale);
+        hoax(fpisWhale, fpisWhale);
         FPIS.approve(address(revestVe), amount);
-        hoax(fpisWhale);
+        hoax(fpisWhale, fpisWhale);
         fnftId = revestVe.createNewLock(expiration, amount);
 
         //Check
@@ -148,9 +153,9 @@ contract veFPISRevest is Test {
         uint expiration = block.timestamp + (2 * 365 * 60 * 60 * 24); // 2 years 
 
         //Minting the FNFT
-        hoax(fpisWhale);
+        hoax(fpisWhale, fpisWhale);
         FPIS.approve(address(revestVe), amount);
-        hoax(fpisWhale);
+        hoax(fpisWhale, fpisWhale);
         fnftId = revestVe.createNewLock(expiration, amount);
         smartWalletAddress = revestVe.getAddressForFNFT(fnftId);
 
@@ -161,9 +166,9 @@ contract veFPISRevest is Test {
         destroyAccount(smartWalletAddress, address(admin));
 
         //Deposit additional fund for FNFT
-        hoax(fpisWhale);
+        hoax(fpisWhale, fpisWhale);
         FPIS.approve(address(revestVe), additionalDepositAmount);
-        hoax(fpisWhale);
+        hoax(fpisWhale, fpisWhale);
         revest.depositAdditionalToFNFT(fnftId, additionalDepositAmount, 1);
         destroyAccount(smartWalletAddress, address(admin));
 
@@ -176,9 +181,10 @@ contract veFPISRevest is Test {
 
         //Skip 2 years
         skip(52 weeks * 2 + 1 weeks);
-        startHoax(fpisWhale);
+        hoax(fpisWhale, fpisWhale);
         uint yieldToClaim = IYieldDistributor(DISTRIBUTOR).earned(smartWalletAddress);
         assertGt(yieldToClaim, 0, "No yield to claim!");
+        hoax(fpisWhale, fpisWhale);
         revest.withdrawFNFT(fnftId, 1);
     }
 
@@ -193,9 +199,9 @@ contract veFPISRevest is Test {
         // uint amount = 1e18; //FPIS  
 
         //Minting the FNFT
-        hoax(fpisWhale);
+        hoax(fpisWhale, fpisWhale);
         FPIS.approve(address(revestVe), amount);
-        hoax(fpisWhale);
+        hoax(fpisWhale, fpisWhale);
         fnftId = revestVe.createNewLock(expiration, amount);
         smartWalletAddress = revestVe.getAddressForFNFT(fnftId);
 
@@ -216,12 +222,12 @@ contract veFPISRevest is Test {
         expiration = time + (4 * 365 * 60 * 60 * 24 - 3600); // 4 years in future in future
 
         //attempt to extend FNFT Maturity more than 2 year max
-        hoax(fpisWhale);
+        hoax(fpisWhale, fpisWhale);
         vm.expectRevert("Max lockup is 4 years");
         revest.extendFNFTMaturity(fnftId, overly_expiration);
 
         //Attempt to extend FNFT Maturity
-        hoax(fpisWhale);
+        hoax(fpisWhale, fpisWhale);
         revest.extendFNFTMaturity(fnftId, expiration);
         destroyAccount(smartWalletAddress, address(admin));
 
@@ -233,7 +239,7 @@ contract veFPISRevest is Test {
 
         //Skip 4 years to end of period
         skip(52 weeks * 4 + 1 weeks);
-        hoax(fpisWhale);
+        hoax(fpisWhale, fpisWhale);
         revest.withdrawFNFT(fnftId, 1);
 
         //Locking
@@ -252,9 +258,9 @@ contract veFPISRevest is Test {
 
 
         //Minting the FNFT
-        hoax(fpisWhale);
+        hoax(fpisWhale, fpisWhale);
         FPIS.approve(address(revestVe), amount);
-        hoax(fpisWhale);
+        hoax(fpisWhale, fpisWhale);
         fnftId = revestVe.createNewLock(expiration, amount);
         smartWalletAddress = revestVe.getAddressForFNFT(fnftId);
 
@@ -273,11 +279,11 @@ contract veFPISRevest is Test {
         destroyAccount(smartWalletAddress, address(admin));
 
         //Yield Claim check
-        hoax(fpisWhale);
+        hoax(fpisWhale, fpisWhale);
         uint yieldToClaim = IYieldDistributor(DISTRIBUTOR).earned(smartWalletAddress);
 
         //Unlocking and withdrawing the NFT
-        hoax(fpisWhale);
+        hoax(fpisWhale, fpisWhale);
         revest.withdrawFNFT(fnftId, 1);
         
         //Balance of FXS after claiming yield
@@ -311,9 +317,9 @@ contract veFPISRevest is Test {
         uint expiration = block.timestamp + (2 * 365 * 60 * 60 * 24); // 2 years 
 
         //Minting the FNFT and Checkpoint for Yield Distributor
-        hoax(fpisWhale);
+        hoax(fpisWhale, fpisWhale);
         FPIS.approve(address(revestVe), amount);
-        hoax(fpisWhale);
+        hoax(fpisWhale, fpisWhale);
         fnftId = revestVe.createNewLock(expiration, amount);
         smartWalletAddress = revestVe.getAddressForFNFT(fnftId);
 
@@ -329,11 +335,11 @@ contract veFPISRevest is Test {
         destroyAccount(smartWalletAddress, address(admin));
 
         //Yield Claim check
-        hoax(fpisWhale);
+        hoax(fpisWhale, fpisWhale);
         uint yieldToClaim = IYieldDistributor(DISTRIBUTOR).earned(smartWalletAddress);
 
         //Claim yield
-        hoax(fpisWhale);
+        hoax(fpisWhale, fpisWhale);
         revestVe.triggerOutputReceiverUpdate(fnftId, bytes(""));
         
         //Balance of FXS after claiming yield
@@ -387,12 +393,12 @@ contract veFPISRevest is Test {
         IVotingEscrow(VOTING_ESCROW).adminSetProxy(address(revestVe));
 
         //Whitelist proxy as a staker level
-        hoax(fpisWhale);
+        hoax(fpisWhale, fpisWhale);
         IVotingEscrow(VOTING_ESCROW).stakerSetProxy(address(revestVe));
 
 
         //Migrating veFPIS from traditional lock to fnft
-        hoax(fpisWhale);
+        hoax(fpisWhale, fpisWhale);
         fnftId = revestVe.migrateExistingLock();
         smartWalletAddress = revestVe.getAddressForFNFT(fnftId);
 
@@ -422,9 +428,9 @@ contract veFPISRevest is Test {
         uint amount = 1e18; //FXS  
 
         //Minting the FNFT and Checkpoint for Yield Distributor
-        hoax(fpisWhale);
+        hoax(fpisWhale, fpisWhale);
         FPIS.approve(address(revestVe), amount);
-        hoax(fpisWhale);
+        hoax(fpisWhale, fpisWhale);
         fnftId = revestVe.createNewLock(expiration, amount); 
         smartWalletAddress = revestVe.getAddressForFNFT(fnftId);
 
@@ -433,7 +439,7 @@ contract veFPISRevest is Test {
         skip(timeSkip);
 
          //Yield Claim check
-        hoax(fpisWhale);
+        hoax(fpisWhale, fpisWhale);
         uint yieldToClaim = IYieldDistributor(DISTRIBUTOR).earned(smartWalletAddress);
 
         //Getting output display values

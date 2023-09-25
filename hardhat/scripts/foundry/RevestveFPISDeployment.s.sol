@@ -33,8 +33,9 @@ contract RevestVeFPISDeployment is Script {
 
         vm.startBroadcast(deployer);
 
-        address revestVeFPIS = factory.deploy(keccak256(abi.encode("RevestVeFPIS")), abi.encodePacked(type(RevestVeFPIS).creationCode, abi.encode(revestRegistry, veFPIS, distritbutor, adminWallet)));
-        SmartWalletWhitelistV3 smartWalletChecker = new SmartWalletWhitelistV3(FraxMultiSig, revestVeFPIS);
+        SmartWalletWhitelistV3 smartWalletChecker = new SmartWalletWhitelistV3(FraxMultiSig);
+        address revestVeFPIS = factory.deploy(keccak256(abi.encode("RevestVeFPIS")), abi.encodePacked(type(RevestVeFPIS).creationCode, abi.encode(revestRegistry, veFPIS, distritbutor, adminWallet, address(smartWalletChecker))));
+        
 
         vm.stopBroadcast();
         console.log("---DEPLOYMENT SUCCESSFUL---");

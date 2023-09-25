@@ -24,9 +24,8 @@ contract SmartWalletWhitelistV3 is AccessControl  {
     event ApproveWallet(address);
     event RevokeWallet(address);
     
-    constructor(address _superAdmin, address _admin) {
+    constructor(address _superAdmin) {
         _setupRole(DEFAULT_ADMIN_ROLE, _superAdmin);
-        _setupRole(ADMIN_ROLE, _admin);
     }
     
     function commitSetChecker(address _checker) external onlyRole(DEFAULT_ADMIN_ROLE) {

@@ -27,7 +27,7 @@ contract SmartWalletWaitlistV3 is Test {
      SmartWalletWhitelistV3 smartWalletChecker;
 
     function setUp() public {
-        smartWalletChecker = new SmartWalletWhitelistV3(superAdmin, admin1);
+        smartWalletChecker = new SmartWalletWhitelistV3(superAdmin);
 
         // label address
         vm.label(superAdmin, "superAdmin");
@@ -38,6 +38,9 @@ contract SmartWalletWaitlistV3 is Test {
         vm.label(wallet2, "wallet2");
         vm.label(wallet3, "wallet3");
         vm.label(stranger, "stranger");
+
+        hoax(superAdmin, superAdmin);
+        smartWalletChecker.grantRole(ADMIN_ROLE, admin1);
     }
 
     /**
