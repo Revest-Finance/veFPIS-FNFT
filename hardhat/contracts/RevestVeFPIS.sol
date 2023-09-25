@@ -62,9 +62,6 @@ contract RevestVeFPIS is IOutputReceiverV3, Ownable, ERC165, IFeeReporter, Reent
     // veFPIS token    
     address public constant REWARD_TOKEN = 0xc2544A32872A91F4A553b404C6950e89De901fdb;
 
-    // Smart Wallet Checker
-    address public SMART_WALLET_CHECKER;
-
     // Template address for VE wallets
     address public immutable TEMPLATE;
 
